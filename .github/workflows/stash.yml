@@ -30,7 +30,9 @@ jobs:
       ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
       STASH_RESULTS: norka/results
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4.4.0
+        with:
+          persist-credentials: true
 
       - name: Достать норку (ветка norka-data)
         run: |
@@ -43,7 +45,7 @@ jobs:
           fi
           mkdir -p data
 
-      - uses: astral-sh/setup-uv@v6
+      - uses: astral-sh/setup-uv@d0cc045d04ccac9d8b7881df0226f9e82c39688e  # v6.8.0
 
       - run: uv sync --frozen
 

@@ -16,8 +16,8 @@ os.environ.setdefault("STASH_MODE", "cloud")
 
 from telegram import Update  # noqa: E402
 
+import crypto_store  # noqa: E402  (до bot: ключ читается при импорте, bot потом чистит окружение)
 import bot  # noqa: E402
-import crypto_store  # noqa: E402
 import persona as P  # noqa: E402
 import storage  # noqa: E402
 

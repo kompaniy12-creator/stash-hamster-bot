@@ -12,11 +12,15 @@ from pathlib import Path
 from cryptography.fernet import Fernet
 
 
+# Ключ читается один раз при импорте: потом agent.scrub_env() убирает его из окружения,
+# чтобы процессы агента его не унаследовали.
+_KEY = os.getenv("STASH_DATA_KEY", "").strip()
+
+
 def _f() -> Fernet:
-    key = os.getenv("STASH_DATA_KEY", "").strip()
-    if not key:
+    if not _KEY:
         sys.exit("STASH_DATA_KEY не задан")
-    return Fernet(key.encode())
+    return Fernet(_KEY.encode())
 
 
 def encrypt_bytes(data: bytes) -> bytes:

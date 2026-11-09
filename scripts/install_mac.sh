@@ -7,6 +7,7 @@ DIR="$(cd "$(dirname "$0")/.." && pwd)"
 MODE="${1:-helper}"
 AGENTS=~/Library/LaunchAgents
 mkdir -p "$AGENTS" "$DIR/data"
+chmod 700 "$DIR/data"; [ -f "$DIR/.env" ] && chmod 600 "$DIR/.env"
 cd "$DIR" && uv sync -q
 
 render() { # label script log schedule

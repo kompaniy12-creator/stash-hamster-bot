@@ -4,6 +4,7 @@ import datetime as dt
 import json
 import logging
 import os
+import re
 from pathlib import Path
 
 from dotenv import load_dotenv
@@ -23,9 +24,19 @@ import agent  # noqa: E402  (после load_dotenv, чтобы подхвати
 import persona as P  # noqa: E402
 import storage  # noqa: E402
 
-logging.basicConfig(format="%(asctime)s %(levelname)s %(name)s: %(message)s", level=logging.INFO)
+# В облаке логи GitHub Actions публичные — пишем только самое необходимое, без содержимого запасов.
+_CLOUD = os.getenv("STASH_MODE", "local") == "cloud"
+logging.basicConfig(format="%(asctime)s %(levelname)s %(name)s: %(message)s",
+                    level=logging.ERROR if _CLOUD else logging.INFO)
 logging.getLogger("httpx").setLevel(logging.WARNING)
 log = logging.getLogger("skill-inbox")
+
+
+def log_exc(what: str, e: BaseException) -> None:
+    if _CLOUD:
+        log.error("%s: %s", what, type(e).__name__)  # без текста ошибки и трейсбэка
+    else:
+        log.exception(what)
 
 TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "").strip()
 _owner = os.getenv("TELEGRAM_ALLOWED_USER_ID", "").strip()
@@ -35,6 +46,7 @@ if not TOKEN or not _owner.isdigit():
         "TELEGRAM_ALLOWED_USER_ID (число от @userinfobot), сохрани файл и запусти снова."
     )
 OWNER_ID = int(_owner)
+agent.scrub_env()
 # local — бот живёт на Mac и ставит сам; cloud — разовый прогон в GitHub Actions, установку делает mac_helper
 MODE = os.getenv("STASH_MODE", "local")
 PENDING: list[asyncio.Future] = []
@@ -111,7 +123,7 @@ async def run_analysis(item_id: int, chat_id: int, msg_id: int, ctx: ContextType
             status=status,
         )
     except Exception as e:  # noqa: BLE001
-        log.exception("analyze failed")
+        log_exc("analyze failed", e)
         storage.update(item_id, status="failed", log=str(e))
         await ctx.bot.edit_message_text(
             clip(P.analyze_failed(item_id, e)), chat_id, msg_id
@@ -131,7 +143,7 @@ async def run_install(item_id: int, chat_id: int, ctx: ContextTypes.DEFAULT_TYPE
     try:
         status, report = await agent.install(storage.get(item_id))
     except Exception as e:  # noqa: BLE001
-        log.exception("install failed")
+        log_exc("install failed", e)
         status, report = "failed", str(e)
     storage.update(item_id, status=status, log=report)
     item = storage.get(item_id)
@@ -160,7 +172,8 @@ async def on_material(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     if m.document:
         FILES_DIR.mkdir(parents=True, exist_ok=True)
         f = await m.document.get_file()
-        dest = FILES_DIR / f"{m.message_id}_{m.document.file_name or 'file'}"
+        safe = re.sub(r"[^\w.\-]+", "_", Path(m.document.file_name or "file").name)[:100] or "file"
+        dest = FILES_DIR / f"{m.message_id}_{safe}"
         await f.download_to_drive(dest)
         file_path = str(dest)
 
@@ -285,7 +298,7 @@ async def daily_nudge(ctx: ContextTypes.DEFAULT_TYPE):
 
 
 async def on_error(update: object, ctx: ContextTypes.DEFAULT_TYPE):
-    log.error("handler error", exc_info=ctx.error)
+    log_exc("handler error", ctx.error)
     try:
         await ctx.bot.send_message(OWNER_ID, clip(P.error(ctx.error)))
     except Exception:  # noqa: BLE001

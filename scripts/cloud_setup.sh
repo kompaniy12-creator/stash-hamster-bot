@@ -2,12 +2,14 @@
 # Переселяет хомяка в GitHub Actions. Запускать из папки проекта после того, как код запушен на GitHub.
 # Нужны: gh (залогинен), заполненный .env (TELEGRAM_BOT_TOKEN, TELEGRAM_ALLOWED_USER_ID).
 set -e
+umask 077
 cd "$(dirname "$0")/.."
 source .env 2>/dev/null || true
 [ -n "$TELEGRAM_BOT_TOKEN" ] && [ -n "$TELEGRAM_ALLOWED_USER_ID" ] || { echo "❌ Заполни .env"; exit 1; }
 REPO=$(gh repo view --json nameWithOwner -q .nameWithOwner)
 echo "🐹 Переезжаем в $REPO"
 uv sync -q
+chmod 600 .env; mkdir -p data; chmod 700 data
 
 # 1. Ключ шифрования норки
 if [ -z "$STASH_DATA_KEY" ]; then
@@ -17,9 +19,9 @@ if [ -z "$STASH_DATA_KEY" ]; then
 fi
 
 # 2. Секреты (значения не выводятся)
-gh secret set TELEGRAM_BOT_TOKEN --body "$TELEGRAM_BOT_TOKEN"
-gh secret set TELEGRAM_ALLOWED_USER_ID --body "$TELEGRAM_ALLOWED_USER_ID"
-gh secret set STASH_DATA_KEY --body "$STASH_DATA_KEY"
+printf %s "$TELEGRAM_BOT_TOKEN" | gh secret set TELEGRAM_BOT_TOKEN
+printf %s "$TELEGRAM_ALLOWED_USER_ID" | gh secret set TELEGRAM_ALLOWED_USER_ID
+printf %s "$STASH_DATA_KEY" | gh secret set STASH_DATA_KEY
 gh variable set STASH_TZ --body "$(readlink /etc/localtime | sed 's|.*/zoneinfo/||')"
 
 # 3. Доступ к Claude
@@ -29,7 +31,7 @@ if ! gh secret list | grep -q CLAUDE_CODE_OAUTH_TOKEN; then
   echo "Войди в аккаунт и скопируй токен (sk-ant-oat...)."
   read -rs "CT?Вставь токен сюда и нажми Enter (символы не видны): "
   echo
-  gh secret set CLAUDE_CODE_OAUTH_TOKEN --body "$CT"
+  printf %s "$CT" | gh secret set CLAUDE_CODE_OAUTH_TOKEN
   unset CT
 fi
 
