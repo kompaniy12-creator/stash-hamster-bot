@@ -1,0 +1,6 @@
+CREATE TABLE IF NOT EXISTS updates (
+  id INTEGER PRIMARY KEY,
+  body TEXT NOT NULL,
+  ack_id INTEGER,
+  created INTEGER
+);

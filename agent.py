@@ -34,7 +34,8 @@ BUFFER = 20 * 1024 * 1024  # 20 МБ: большие страницы не ро�
 MAX_FILE_CHARS = 40_000
 
 # Переменные, которые агенту видеть незачем (токен бота, ключ норки).
-BOT_SECRETS = ("TELEGRAM_BOT_TOKEN", "STASH_DATA_KEY", "TELEGRAM_ALLOWED_USER_ID", "GITHUB_TOKEN", "GH_TOKEN")
+BOT_SECRETS = ("TELEGRAM_BOT_TOKEN", "STASH_DATA_KEY", "TELEGRAM_ALLOWED_USER_ID", "GITHUB_TOKEN", "GH_TOKEN",
+               "STASH_QUEUE_SECRET")
 
 
 def scrub_env() -> None:

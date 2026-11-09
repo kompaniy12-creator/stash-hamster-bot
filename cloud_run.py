@@ -13,6 +13,12 @@ from pathlib import Path
 from types import SimpleNamespace
 
 os.environ.setdefault("STASH_MODE", "cloud")
+# Очередь Cloudflare Worker (мгновенный режим). Читаем до импорта bot — он чистит секреты из окружения.
+QUEUE_URL = os.getenv("STASH_QUEUE_URL", "").rstrip("/")
+QUEUE_SECRET = os.getenv("STASH_QUEUE_SECRET", "")
+os.environ.pop("STASH_QUEUE_SECRET", None)
+
+import httpx  # noqa: E402
 
 from telegram import Update  # noqa: E402
 
@@ -55,6 +61,31 @@ async def reminders(tg_bot) -> None:
         await bot.daily_nudge(ctx)
 
 
+async def fetch_updates(tg_bot) -> tuple[list[Update], list[int]]:
+    """Апдейты из очереди Worker (webhook) или напрямую из Telegram (getUpdates)."""
+    if QUEUE_URL:
+        async with httpx.AsyncClient(timeout=20) as c:
+            r = await c.post(f"{QUEUE_URL}/drain", headers={"authorization": f"Bearer {QUEUE_SECRET}"})
+            r.raise_for_status()
+        rows = r.json()
+        ups = []
+        for row in rows:
+            u = Update.de_json(json.loads(row["body"]), tg_bot)
+            if row.get("ack_id"):
+                bot.ACK[u.update_id] = int(row["ack_id"])
+            ups.append(u)
+        return ups, [row["id"] for row in rows]
+    offset = storage.meta_get("tg_offset")
+    return list(await tg_bot.get_updates(offset=offset, timeout=0, allowed_updates=Update.ALL_TYPES)), []
+
+
+async def confirm(ids: list[int]) -> None:
+    if QUEUE_URL and ids:
+        async with httpx.AsyncClient(timeout=20) as c:
+            await c.post(f"{QUEUE_URL}/done", json={"ids": ids},
+                         headers={"authorization": f"Bearer {QUEUE_SECRET}"})
+
+
 async def main() -> None:
     app = bot.build_app()
     await app.initialize()
@@ -64,11 +95,14 @@ async def main() -> None:
             storage.meta_set("commands_version", COMMANDS_VERSION)
 
         got = ingest_results(app.bot)
-        offset = storage.meta_get("tg_offset")
-        updates = await app.bot.get_updates(offset=offset, timeout=0, allowed_updates=Update.ALL_TYPES)
-        for u in updates:
+        updates, queue_ids = await fetch_updates(app.bot)
+        done_before = storage.meta_get("tg_offset") or 0
+        for u in sorted(updates, key=lambda x: x.update_id):
+            if u.update_id < done_before:
+                continue  # уже обработан в прошлом прогоне
             storage.meta_set("tg_offset", u.update_id + 1)  # сначала сдвигаем: упавшее сообщение не зациклится
             await app.process_update(u)
+        await confirm(queue_ids)
         while bot.PENDING:  # разборы, запущенные хендлерами
             batch, bot.PENDING[:] = bot.PENDING[:], []
             await asyncio.gather(*batch, return_exceptions=True)

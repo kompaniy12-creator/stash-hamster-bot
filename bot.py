@@ -50,6 +50,7 @@ agent.scrub_env()
 # local — бот живёт на Mac и ставит сам; cloud — разовый прогон в GitHub Actions, установку делает mac_helper
 MODE = os.getenv("STASH_MODE", "local")
 PENDING: list[asyncio.Future] = []
+ACK: dict[int, int] = {}  # update_id -> id сообщения «Хап!», которое уже отправил Cloudflare Worker
 
 
 def spawn(ctx: ContextTypes.DEFAULT_TYPE, coro) -> None:
@@ -180,7 +181,15 @@ async def on_material(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     if not text.strip() and not file_path:
         return
     item_id = storage.add(text.strip() or "(файл)", file_path)
-    reply = await m.reply_text(P.received(item_id))
+    ack_id = ACK.get(update.update_id)
+    reply = None
+    if ack_id:  # Worker уже сказал «Хап!» — дописываем то же сообщение, а не шлём новое
+        try:
+            reply = await ctx.bot.edit_message_text(P.received(item_id), m.chat_id, ack_id)
+        except Exception:  # noqa: BLE001
+            reply = None
+    if reply is None or reply is True:
+        reply = await m.reply_text(P.received(item_id))
     spawn(ctx, run_analysis(item_id, reply.chat_id, reply.message_id, ctx))
 
 
@@ -259,7 +268,10 @@ async def on_button(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         return
     action, raw_id = q.data.split(":")
     item_id = int(raw_id)
-    await q.answer()
+    try:
+        await q.answer()  # в мгновенном режиме Worker уже ответил на кнопку
+    except Exception:  # noqa: BLE001
+        pass
     if action == "install":
         await q.edit_message_reply_markup(None)
         spawn(ctx, run_install(item_id, q.message.chat_id, ctx))

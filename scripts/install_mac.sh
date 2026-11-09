@@ -20,6 +20,9 @@ render() { # label script log schedule
 stop() { [ -f "$AGENTS/$1.plist" ] && launchctl unload "$AGENTS/$1.plist" 2>/dev/null && rm "$AGENTS/$1.plist" || true; }
 
 if [ "$MODE" = local ]; then
+  # локальный бот читает Telegram сам — снимаем webhook мгновенного режима, если он был
+  ( source "$DIR/.env"; curl -s -K - <<< "url = \"https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/deleteWebhook\"" >/dev/null ) || true
+  gh variable delete STASH_QUEUE_URL >/dev/null 2>&1 || true
   stop com.stash.helper
   render com.stash.bot bot.py bot.log '<key>RunAtLoad</key><true/><key>KeepAlive</key><true/>'
   echo "🐹 Хомяк живёт на этом Mac. Лог: data/bot.log"

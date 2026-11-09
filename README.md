@@ -63,9 +63,23 @@ zsh scripts/cloud_setup.sh
 
 Посмотреть прогоны: `gh run list --workflow=stash.yml`.
 
+### ⚡ Мгновенный режим (Cloudflare Worker, бесплатно)
+Без него облачный хомяк отвечает раз в 5–15 минут. С ним бесплатный Cloudflare Worker принимает сообщения
+Telegram, **за секунду** отвечает «🐹 Хап!», снимает «часики» с кнопок и сразу будит GitHub Actions.
+Карточка приходит примерно через минуту.
+```bash
+zsh scripts/instant_setup.sh
+```
+Скрипт логинит тебя в Cloudflare, создаёт очередь (D1), выкладывает Worker и просит токен GitHub
+с одним правом: **Actions: Read and write** на этот репозиторий. Потом подключает webhook Telegram.
+После этого расписание нужно только для напоминаний: раз в 15 минут.
+
 ## Как устроено
 ```
-Telegram ──► GitHub Actions (раз в 5 мин): cloud_run.py
+Telegram ──► Cloudflare Worker: «🐹 Хап!» за 1 сек, апдейт в очередь D1, будит workflow
+                 │
+                 ▼
+             GitHub Actions: cloud_run.py (забирает очередь; ещё раз в 15 мин по расписанию)
                  │  разбор: Claude Agent SDK (только чтение: WebFetch, WebSearch, Read)
                  │  кнопка «Разгрузить» ─► статус approved
                  ▼
@@ -85,9 +99,12 @@ Telegram ──► GitHub Actions (раз в 5 мин): cloud_run.py
 | `cloud_run.py` | один прогон в Actions |
 | `mac_helper.py` | грузчик на Mac |
 | `crypto_store.py` | шифрование каталога |
+| `worker/` | Cloudflare Worker для мгновенного режима |
 
 ## Безопасность
-- Бот отвечает только на `TELEGRAM_ALLOWED_USER_ID`.
+- Бот отвечает только на `TELEGRAM_ALLOWED_USER_ID`. Worker проверяет секретный заголовок Telegram
+  (`secret_token`), а очередь отдаёт апдейты только по отдельному ключу.
+- Токену GitHub в Worker нужно одно право: запускать workflow (Actions: write) в одном репозитории.
 - Анализ идёт **только на чтение**. Установку с доступом к Bash агент запускает только после твоей кнопки.
   Запрет на sudo и удаление файлов задан в промпте, жёстко он не проверяется, поэтому смотри поле «Риск» перед установкой.
 - В публичном репозитории каталог лежит только в зашифрованном виде. Не теряй `STASH_DATA_KEY` из `.env`.

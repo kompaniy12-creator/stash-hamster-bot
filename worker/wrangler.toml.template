@@ -1,0 +1,8 @@
+name = "stash-hamster"
+main = "src/index.js"
+compatibility_date = "2026-10-01"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "stash-queue"
+database_id = "__DB_ID__"
