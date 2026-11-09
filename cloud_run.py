@@ -30,7 +30,7 @@ import persona as P  # noqa: E402
 import storage  # noqa: E402
 
 RESULTS_DIR = Path(os.getenv("STASH_RESULTS", "norka/results"))
-COMMANDS_VERSION = 5  # поднять, если поменялся список команд или кнопка меню
+COMMANDS_VERSION = 6  # поднять, если поменялся список команд или кнопка меню
 
 
 def ingest_results(tg_bot) -> int:
@@ -39,10 +39,11 @@ def ingest_results(tg_bot) -> int:
     for f in sorted(RESULTS_DIR.glob("*.json.enc")) if RESULTS_DIR.exists() else []:
         try:
             r = json.loads(crypto_store.decrypt_bytes(f.read_bytes()))
-            if r.get("kind") == "removal":
-                q = [x for x in (storage.meta_get("remove_queue") or [])
+            if r.get("kind") in ("removal", "update"):
+                qname = "remove_queue" if r["kind"] == "removal" else "update_queue"
+                q = [x for x in (storage.meta_get(qname) or [])
                      if not (x["target"] == r["target"] and x["requested_at"] == r["requested_at"])]
-                storage.meta_set("remove_queue", q)
+                storage.meta_set(qname, q)
                 f.unlink()
                 n += 1
                 continue
@@ -117,7 +118,8 @@ def catalog_snapshot() -> dict:
                       "plan": plan, "risk": it.get("risk"), "status": it["status"], "comment": it.get("comment"),
                       "can": can, "names": names, "created_at": it.get("created_at"),
                       "report": (it.get("log") or "")[:4000] if it["status"] != "ready" else None})
-    return {"items": items, "remove_queue": storage.meta_get("remove_queue") or []}
+    return {"items": items, "remove_queue": storage.meta_get("remove_queue") or [],
+            "update_queue": storage.meta_get("update_queue") or []}
 
 
 async def load_inventory() -> None:

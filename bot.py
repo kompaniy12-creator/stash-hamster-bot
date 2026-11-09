@@ -81,6 +81,10 @@ def card(item: dict) -> str:
     lines = [f"**#{item['id']} · {one(item.get('title') or 'без названия')}**"]
     meta = [x for x in (item.get("kind"), storage.STATUSES.get(item["status"], item["status"])) if x]
     lines.append(" · ".join(meta))
+    raw = item.get("raw_input") or ""
+    if raw.startswith("[голосовое сообщение, расшифровка]:"):
+        heard = raw.split(":", 1)[1].split("\n")[0].strip()
+        lines.append(f"🎙 Ты сказал: «{one(heard)[:300]}»")
     if item.get("summary"):
         lines += ["", one(item["summary"])]
     can = item.get("can")
@@ -236,6 +240,29 @@ async def on_material(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         text += "\n\nСсылки: " + " ".join(urls)
 
     file_path = None
+    voice = m.voice or m.audio or m.video_note
+    if voice:
+        FILES_DIR.mkdir(parents=True, exist_ok=True)
+        vf = await voice.get_file()
+        dest = FILES_DIR / f"{m.message_id}_voice"
+        await vf.download_to_drive(dest)
+        try:
+            import voice as V  # noqa: PLC0415
+            heard = await asyncio.to_thread(V.transcribe, str(dest))
+        except Exception as e:  # noqa: BLE001
+            log_exc("transcribe failed", e)
+            heard = ""
+        finally:
+            dest.unlink(missing_ok=True)
+        if not heard:
+            await m.reply_text("🐹🎙 Не разобрал голос — шум или тишина. Скажи ещё раз или пришли текстом.")
+            return
+        low = heard.lower()
+        if low.startswith(("что у меня", "есть ли у меня", "что есть", "поищи в норке", "найди в норке")):
+            spawn(ctx, answer_search(heard, m.chat_id, ctx, ACK.get(update.update_id)))
+            return
+        text = (f"[голосовое сообщение, расшифровка]: {heard}\n"
+                "(Если тут нет ссылки — пользователь описал инструмент словами: найди его через WebSearch.)")
     if m.document:
         FILES_DIR.mkdir(parents=True, exist_ok=True)
         f = await m.document.get_file()
@@ -245,6 +272,10 @@ async def on_material(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         file_path = str(dest)
 
     if not text.strip() and not file_path:
+        return
+    raw = (m.text or "").strip()
+    if raw.startswith("?") and not urls and not file_path and "http" not in raw and not m.forward_origin:
+        spawn(ctx, answer_search(raw.lstrip("? ").strip(), m.chat_id, ctx, ACK.get(update.update_id)))
         return
     item_id = storage.add(text.strip() or "(файл)", file_path)
     ack_id = ACK.get(update.update_id)
@@ -361,6 +392,55 @@ async def cmd_remove(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
             await update.message.reply_text(P.removal_done(n, ok, msg))
 
 
+def catalog_listing() -> str:
+    rows = []
+    for it in storage.list_items(limit=300):
+        rows.append(f"#{it['id']} | {it['status']} | {it.get('title') or it['raw_input'][:60]} | {(it.get('summary') or '')[:140]}")
+    return "\n".join(rows)
+
+
+async def answer_search(question: str, chat_id: int, ctx, edit_id: int | None = None):
+    if edit_id is None:
+        m = await ctx.bot.send_message(chat_id, "🔎 grep -ri по норке…")
+        edit_id = m.message_id
+    try:
+        text = await agent.ask(question, installed_listing() or "", catalog_listing())
+    except Exception as e:  # noqa: BLE001
+        log_exc("search failed", e)
+        text = "🐹 grep упал. Попробуй ещё раз чуть позже."
+    await tgfmt.send_md(ctx.bot, chat_id, text, edit_message_id=edit_id)
+
+
+async def cmd_find(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    q = " ".join(ctx.args or []).strip()
+    if not q:
+        await update.message.reply_text("🐹 Missing argument. Синтаксис: /find seo — или просто напиши «? что есть для видео»")
+        return
+    spawn(ctx, answer_search(q, update.effective_chat.id, ctx, ACK.get(update.update_id)))
+
+
+async def cmd_update(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    targets = [t for t in (ctx.args or []) if TARGET_RX.match(t)][:80]
+    if not targets:
+        await update.message.reply_text("🐹 Missing argument. Синтаксис: /update plugin:имя@маркет. Проще — из норки, вкладка «Прод».")
+        return
+    names = [t.split(":", 1)[1].split("@")[0] for t in targets]
+    label = names[0] if len(names) == 1 else f"{len(names)} шт."
+    if MODE == "cloud":
+        q = storage.meta_get("update_queue") or []
+        now = dt.datetime.now().isoformat(timespec="seconds")
+        for t in targets:
+            if not any(x["target"] == t for x in q):
+                q.append({"target": t, "requested_at": now})
+        storage.meta_set("update_queue", q)
+        await update.message.reply_text(P.update_queued(label))
+    else:
+        import updates  # noqa: PLC0415
+        for t, n in zip(targets, names):
+            ok, msg = updates.apply(t)
+            await update.message.reply_text(P.update_done(n, ok, msg))
+
+
 async def cmd_cleanup(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     url = dashboard_url()
     kb = InlineKeyboardMarkup([[InlineKeyboardButton("🧹 Открыть аудит", web_app=WebAppInfo(url + "#cleanup"))]]) if url else None
@@ -468,10 +548,13 @@ def build_app() -> Application:
     app.add_handler(CommandHandler("replace", cmd_replace, filters=OWNER))
     app.add_handler(CommandHandler("remove", cmd_remove, filters=OWNER))
     app.add_handler(CommandHandler("cleanup", cmd_cleanup, filters=OWNER))
+    app.add_handler(CommandHandler("update", cmd_update, filters=OWNER))
+    app.add_handler(CommandHandler("find", cmd_find, filters=OWNER))
     app.add_error_handler(on_error)
     app.add_handler(CallbackQueryHandler(on_button))
     app.add_handler(MessageHandler(
-        OWNER & ~filters.COMMAND & (filters.TEXT | filters.CAPTION | filters.Document.ALL),
+        OWNER & ~filters.COMMAND & (filters.TEXT | filters.CAPTION | filters.Document.ALL
+                                    | filters.VOICE | filters.AUDIO | filters.VIDEO_NOTE),
         on_material,
     ))
     return app

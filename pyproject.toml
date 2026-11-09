@@ -10,3 +10,14 @@ dependencies = [
     "pypdf>=7.0.0",
     "cryptography>=50.0.2",
 ]
+
+[project.optional-dependencies]
+voice = [
+    "faster-whisper>=1.2.1",
+    "numpy>=2.4.6",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=9.2.0",
+]

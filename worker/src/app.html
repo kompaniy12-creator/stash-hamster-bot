@@ -41,7 +41,7 @@
 const tg = window.Telegram && window.Telegram.WebApp;
 if (tg) { tg.ready(); tg.expand(); }
 const $ = (s) => document.querySelector(s);
-const state = { tab: location.hash === "#cleanup" ? "clean" : "wait", q: "", kind: "", sort: "smart", data: null, open: new Set(), pendingRm: new Set() };
+const state = { tab: location.hash === "#cleanup" ? "clean" : location.hash === "#updates" ? "inst" : "wait", pendingUp: new Set(), q: "", kind: "", sort: "smart", data: null, open: new Set(), pendingRm: new Set() };
 
 function h(tag, attrs, ...kids) {
   const el = document.createElement(tag);
@@ -246,6 +246,7 @@ function pluginNode(p) {
   return itemNode(`p${p.name}`, {
     icon: "🧩", title: p.name, why: p.why || p.description,
     tags: [p.by_stash ? h("span", { class: "tag st" }, "🐹 задеплоил Стэш") : null, usageTag(p.usage),
+      (state.data?.inventory?.data?.updates || []).some((u) => u.id === `plugin:${p.id}`) ? h("span", { class: "tag warn" }, "⬆️ есть обновление") : null,
       p.version ? h("span", { class: "tag" }, `v${p.version}`) : null,
       p.skills?.length ? h("span", { class: "tag" }, plural(p.skills.length, "скилл", "скилла", "скиллов")) : null,
       p.commands?.length ? h("span", { class: "tag" }, plural(p.commands.length, "команда", "команды", "команд")) : null].filter(Boolean),
@@ -260,6 +261,51 @@ const CLEAN = {
   unused: ["💤 Idle-процессы", "Не использовались 90 дней и стоят дольше месяца. Посчитано по истории Claude Code на этом Mac."],
 };
 const TYPE_KIND = { skill: "claude-skill", plugin: "claude-plugin", mcp: "mcp-server" };
+
+function updateMany(targets, label, btn) {
+  const go = async () => {
+    if (btn) btn.disabled = true;
+    try {
+      const r = await fetch("/api/action", { method: "POST", headers: { "content-type": "application/json" },
+        body: JSON.stringify({ initData: tg?.initData || "", action: "update", target: targets }) });
+      if (!r.ok) throw new Error(r.status);
+      targets.forEach((t) => state.pendingUp.add(t));
+      tg?.HapticFeedback?.notificationOccurred("success");
+      toast("⬆️ Апгрейд в пайплайне — накачу, когда Mac онлайн");
+      render();
+    } catch {
+      if (btn) btn.disabled = false;
+      tg?.HapticFeedback?.notificationOccurred("error"); toast("Exit code 1. Попробуй ещё раз");
+    }
+  };
+  const msg = `Обновить ${label}? После обновления плагинов нужен перезапуск Claude Code.`;
+  if (tg?.showConfirm) tg.showConfirm(msg, (yes) => yes && go()); else if (confirm(msg)) go();
+}
+
+function updatesNodes(inv, queue) {
+  const ups = (inv.updates || []).filter((u) => match(u.name, u.current, u.latest));
+  if (!ups.length) return [];
+  const pending = new Set([...(queue || []).map((q) => q.target), ...state.pendingUp]);
+  const free = ups.filter((u) => !pending.has(u.id));
+  const out = [h("h2", {}, `⬆️ Доступны обновления · ${ups.length}`),
+    h("div", { class: "note" }, "Нашёл по манифестам маркетплейсов. Обновляет грузчик на Mac, потом нужен рестарт Claude Code.")];
+  if (free.length > 1) out.push(h("div", { class: "bulk" }, h("button", { class: "b sec",
+    onclick: (e) => updateMany(free.map((u) => u.id), `все ${free.length}`, e.currentTarget) }, `⬆️ Обновить все ${free.length}`)));
+  out.push(h("div", { class: "list" }, ups.map((u) => {
+    const obj = invLookup(inv, u.id);
+    const isPending = pending.has(u.id);
+    return itemNode(`u${u.id}`, {
+      icon: u.type === "plugin" ? "🧩" : "🧠", title: u.name, status: isPending ? "В пайплайне апгрейда" : "Есть свежая версия",
+      why: `${u.current || "?"} → ${u.latest || "новее"}`,
+      tags: [h("span", { class: "tag warn" }, `⬆️ ${u.current || "?"} → ${u.latest || "новее"}`),
+        isPending ? h("span", { class: "tag st" }, "🚚 накачу, когда Mac онлайн") : null].filter(Boolean),
+      details: [...aboutNodes(obj, u.type),
+        isPending ? h("p", { class: "orig", style: "margin-top:12px" }, "Уже в очереди. Жду пинга от Mac.") :
+          h("div", { class: "acts" }, h("button", { class: "b pri", onclick: (e) => updateMany([u.id], `«${u.name}»`, e.currentTarget) }, "⬆️ Обновить"))],
+    });
+  })));
+  return out;
+}
 
 function removeMany(targets, label, btn) {
   const go = async () => {
@@ -349,6 +395,7 @@ function render() {
     if (!nodes.length) nodes = [h("div", { class: "empty" }, h("div", { class: "big" }, "🐹"), state.q ? "Ничего не нашёл" : "Бэклог пуст, всё в проде. Кидай новые пакеты в чат. 💾")];
   } else if (state.tab === "inst") {
     nodes = [
+      ...updatesNodes(inv, d.catalog?.data?.update_queue),
       ...sect("Плагины", inv.plugins.filter((p) => (!state.kind || state.kind === "claude-plugin") && match(p.name, p.description, p.why, (p.skills || []).map((s) => s.name + " " + (s.why || "")).join(" "))).map(pluginNode)),
       ...sect("Личные скиллы", inv.skills.filter((s) => (!state.kind || state.kind === "claude-skill") && match(s.name, s.description, s.why)).map((s) => skillNode(s, "s"))),
       ...sect("MCP-серверы", inv.mcp.filter((m) => (!state.kind || state.kind === "mcp-server") && match(m.name, m.why)).map((m) => itemNode(`m${m.name}`, {

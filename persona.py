@@ -108,6 +108,24 @@ def cleanup_nudge(dup: int, unused: int, overlap: int, broken: int) -> str:
                 f"🐹 > du -sh ~/.claude… многовато. {what}. Загляни в «🧹 Уборка» — выпилю в один клик, с бэкапом в Корзину.")
 
 
+def update_queued(label: str) -> str:
+    return pick(f"⬆️ Апгрейд «{label}» в пайплайне. Грузчик накатит, когда Mac онлайн.",
+                f"🐹 Патчи для «{label}» поставлены в очередь. Накачу при первом пинге.")
+
+
+def update_done(name: str, ok: bool, msg: str) -> str:
+    if ok:
+        return pick(f"⬆️ «{name}» обновлён. Перезапусти Claude Code, чтобы подхватил. ({msg})",
+                    f"⬆️ Патч на «{name}» накатан. Нужен рестарт Claude Code.")
+    return f"🐹 Апгрейд «{name}» упал: {msg}"
+
+
+def updates_nudge(n: int, names: list[str]) -> str:
+    sample = ", ".join(names[:4]) + ("…" if len(names) > 4 else "")
+    return pick(f"⬆️ > apt list --upgradable: {plural(n, 'пакет', 'пакета', 'пакетов')} можно обновить ({sample}). Накатить — в норке, вкладка «Прод».",
+                f"🐹 Вышли свежие версии: {sample}. Всего {n}. Обновлю в один клик из норки.")
+
+
 def later(n: int) -> str:
     return pick(f"🌰 #{n} в бэклоге. Cron-напоминалка уже настроена.",
                 f"🐹 Ок, #{n} подождёт. Но я буду пинговать…",
@@ -189,4 +207,5 @@ COMMANDS = [
     ("reanalyze", "пересканировать: /reanalyze N"),
     ("skip", "в /dev/null: /skip N"),
     ("cleanup", "аудит: что выпилить"),
+    ("find", "grep по норке: /find seo"),
 ]

@@ -77,7 +77,15 @@ async function handleTelegram(req, env, ctx) {
   let ackId = null;
   if (msg) {
     const text = msg.text || "";
-    if (text.startsWith("/")) {
+    if (msg.voice || msg.audio || msg.video_note) {
+      const r = await tg(env, "sendMessage", { chat_id: msg.chat.id, text: "🐹🎙 Записал голос. Прогоняю через Whisper…",
+        reply_parameters: { message_id: msg.message_id } });
+      ackId = (r.result && r.result.message_id) || null;
+    } else if (text.startsWith("/find") || (text.startsWith("?") && !/https?:/.test(text))) {
+      const r = await tg(env, "sendMessage", { chat_id: msg.chat.id, text: "🔎 grep -ri по норке…",
+        reply_parameters: { message_id: msg.message_id } });
+      ackId = (r.result && r.result.message_id) || null;
+    } else if (text.startsWith("/")) {
       await tg(env, "sendChatAction", { chat_id: msg.chat.id, action: "typing" });
     } else {
       const r = await tg(env, "sendMessage", {
@@ -159,9 +167,9 @@ async function apiAction(req, env, ctx) {
   const { initData, id, action, target } = await req.json().catch(() => ({}));
   const user = await ownerFromInitData(initData, env);
   if (!user) return new Response("forbidden", { status: 403 });
-  const cmd = { install: "install", skip: "skip", replace: "replace", remove: "remove" }[action];
+  const cmd = { install: "install", skip: "skip", replace: "replace", remove: "remove", update: "update" }[action];
   let arg;
-  if (cmd === "remove") {
+  if (cmd === "remove" || cmd === "update") {
     const list = Array.isArray(target) ? target : [target];
     const ok = list.length > 0 && list.length <= 80 &&
       list.every((t) => typeof t === "string" && /^(skill|plugin|mcp):[A-Za-z0-9_.@+-]{1,120}$/.test(t));
