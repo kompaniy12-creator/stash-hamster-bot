@@ -21,6 +21,7 @@ from telegram.ext import (
 load_dotenv(Path(__file__).parent / ".env")
 
 import tgfmt  # noqa: E402
+from progress import Progress  # noqa: E402
 import agent  # noqa: E402  (после load_dotenv, чтобы подхватить AGENT_MODEL)
 import persona as P  # noqa: E402
 import storage  # noqa: E402
@@ -155,7 +156,11 @@ def installed_listing() -> str | None:
 async def run_analysis(item_id: int, chat_id: int, msg_id: int, ctx: ContextTypes.DEFAULT_TYPE):
     storage.update(item_id, status="analyzing")
     try:
-        res = await agent.analyze(storage.get(item_id), installed=installed_listing())
+        prog = await Progress(ctx.bot, chat_id, msg_id, f"🐹⌨️ Сканирую пакет #{item_id}…", expected=60).start()
+        try:
+            res = await agent.analyze(storage.get(item_id), installed=installed_listing(), on_tool=prog.event)
+        finally:
+            await prog.finish(ok=True, head=f"🐹 Скан #{item_id} завершён, собираю карточку…")
         status = "installed" if res.get("already_installed") else (
             "ready" if res.get("can_auto_install") else "manual"
         )
@@ -192,12 +197,15 @@ async def run_install(item_id: int, chat_id: int, ctx: ContextTypes.DEFAULT_TYPE
         await ctx.bot.send_message(chat_id, P.replace_queued(item_id, targets) if targets else P.approved(item_id))
         return
     storage.update(item_id, status="installing")
-    msg = await ctx.bot.send_message(chat_id, P.installing(item_id, storage.get(item_id).get("title") or "без названия"))
+    title = storage.get(item_id).get("title") or "без названия"
+    msg = await ctx.bot.send_message(chat_id, P.installing(item_id, title))
+    prog = await Progress(ctx.bot, chat_id, msg.message_id, f"⌨️ Деплою #{item_id} «{title}»", expected=150).start()
     try:
-        status, report = await agent.install(storage.get(item_id))
+        status, report = await agent.install(storage.get(item_id), on_tool=prog.event)
     except Exception as e:  # noqa: BLE001
         log_exc("install failed", e)
         status, report = "failed", str(e)
+    await prog.finish(ok=status == "installed")
     if status == "installed" and targets:  # локальный режим: убираем старое сразу
         import remover  # noqa: PLC0415
         for t in targets:

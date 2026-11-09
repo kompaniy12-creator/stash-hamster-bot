@@ -22,6 +22,7 @@ import agent  # noqa: E402
 import crypto_store  # noqa: E402
 import persona as P  # noqa: E402
 import tgfmt  # noqa: E402
+from progress import Progress  # noqa: E402
 from telegram import Bot  # noqa: E402
 
 # ключ дашборда читаем сразу: agent.scrub_env() потом уберёт секреты из окружения
@@ -85,11 +86,14 @@ async def main() -> None:
     async with tg:
         for it in todo:
             key = f"{it['id']}@{it.get('approved_at')}"
-            await tg.send_message(chat, P.installing(it["id"], it.get("title") or "без названия"))
+            title = it.get("title") or "без названия"
+            m = await tg.send_message(chat, P.installing(it["id"], title))
+            prog = await Progress(tg, chat, m.message_id, f"⌨️ Деплою #{it['id']} «{title}»", expected=150).start()
             try:
-                status, report = await agent.install(it)
+                status, report = await agent.install(it, on_tool=prog.event)
             except Exception as e:  # noqa: BLE001
                 status, report = "failed", str(e)
+            await prog.finish(ok=status == "installed", head=f"{P.install_head(status)} · #{it['id']} «{title}»")
             targets = it.get("replace_targets") or []
             if isinstance(targets, str):
                 targets = json.loads(targets or "[]")

@@ -21,6 +21,7 @@ from claude_agent_sdk import (
     HookMatcher,
     ResultMessage,
     TextBlock,
+    ToolUseBlock,
     query,
 )
 
@@ -213,7 +214,7 @@ def _material(item: dict) -> str:
     return s
 
 
-async def _run(prompt: str, options: ClaudeAgentOptions) -> str:
+async def _run(prompt: str, options: ClaudeAgentOptions, on_tool=None) -> str:
     texts: list[str] = []
     result = ""
     async for msg in query(prompt=prompt, options=options):
@@ -221,6 +222,11 @@ async def _run(prompt: str, options: ClaudeAgentOptions) -> str:
             for block in msg.content:
                 if isinstance(block, TextBlock):
                     texts.append(block.text)
+                elif isinstance(block, ToolUseBlock) and on_tool:
+                    try:
+                        on_tool(block.name, block.input or {})
+                    except Exception:  # noqa: BLE001  прогресс не должен ронять агента
+                        pass
         elif isinstance(msg, ResultMessage):
             result = msg.result or ""
     return result or "\n".join(texts)
@@ -245,7 +251,7 @@ def installed_listing(inv: dict | None) -> str:
     return "\n".join(rows)[:30000] or "нет"
 
 
-async def analyze(item: dict, installed: str | None = None) -> dict:
+async def analyze(item: dict, installed: str | None = None, on_tool=None) -> dict:
     WORKDIR.mkdir(parents=True, exist_ok=True)
     scrub_env()
     options = ClaudeAgentOptions(
@@ -260,12 +266,12 @@ async def analyze(item: dict, installed: str | None = None) -> dict:
     )
     text = await _run(
         ANALYZE_PROMPT.format(installed=installed or _installed_skills(), material=_material(item), character=CHARACTER),
-        options,
+        options, on_tool,
     )
     return _extract_json(text)
 
 
-async def install(item: dict) -> tuple[str, str]:
+async def install(item: dict, on_tool=None) -> tuple[str, str]:
     """Возвращает (status, отчёт)."""
     WORKDIR.mkdir(parents=True, exist_ok=True)
     scrub_env()
@@ -288,7 +294,7 @@ async def install(item: dict) -> tuple[str, str]:
     )
     text = await _run(
         INSTALL_PROMPT.format(title=item.get("title"), kind=item.get("kind"), plan=plan_lines, workdir=WORKDIR),
-        options,
+        options, on_tool,
     )
     m = re.search(r"STATUS:\s*(installed|manual|failed)", text)
     status = m.group(1) if m else "failed"
