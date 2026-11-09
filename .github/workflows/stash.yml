@@ -1,0 +1,76 @@
+name: Stash 🐹
+
+on:
+  schedule:
+    - cron: "*/5 * * * *"   # GitHub запускает с задержкой, реально раз в 5–15 минут
+  workflow_dispatch:
+
+concurrency:
+  group: stash
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  hamster:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      STASH_MODE: cloud
+      TZ: ${{ vars.STASH_TZ || 'UTC' }}
+      NUDGE_HOUR: ${{ vars.NUDGE_HOUR || '19' }}
+      REMINDER_HOUR: ${{ vars.REMINDER_HOUR || '10' }}
+      REMINDER_WEEKDAY: ${{ vars.REMINDER_WEEKDAY || '1' }}
+      AGENT_MODEL: ${{ vars.AGENT_MODEL }}
+      TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+      TELEGRAM_ALLOWED_USER_ID: ${{ secrets.TELEGRAM_ALLOWED_USER_ID }}
+      STASH_DATA_KEY: ${{ secrets.STASH_DATA_KEY }}
+      CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+      STASH_RESULTS: norka/results
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Достать норку (ветка norka-data)
+        run: |
+          git config user.name "stash-hamster[bot]"
+          git config user.email "stash-hamster@users.noreply.github.com"
+          if git fetch origin norka-data 2>/dev/null; then
+            git worktree add -B norka-data norka origin/norka-data
+          else
+            git worktree add --orphan -b norka-data norka
+          fi
+          mkdir -p data
+
+      - uses: astral-sh/setup-uv@v6
+
+      - run: uv sync --frozen
+
+      - name: Расшифровать
+        run: |
+          if [ -f norka/norka.enc ]; then
+            uv run python crypto_store.py decrypt norka/norka.enc data/norka.json
+          fi
+
+      - name: Хомяк просыпается
+        run: uv run python cloud_run.py
+
+      - name: Спрятать норку обратно
+        run: |
+          new_sha=$(sha256sum data/norka.json | cut -d' ' -f1)
+          old_sha=$(cat norka/norka.sha 2>/dev/null || true)
+          if [ "$new_sha" != "$old_sha" ]; then
+            uv run python crypto_store.py encrypt data/norka.json norka/norka.enc
+            echo "$new_sha" > norka/norka.sha
+          fi
+          cd norka
+          git add -A
+          if git diff --cached --quiet; then echo "без изменений"; exit 0; fi
+          git commit -q -m "🐹 норка обновлена"
+          for i in 1 2 3 4 5; do
+            git pull -q --rebase origin norka-data 2>/dev/null || true
+            git push -q origin HEAD:norka-data && exit 0
+            sleep $((i * 3))
+          done
+          exit 1
