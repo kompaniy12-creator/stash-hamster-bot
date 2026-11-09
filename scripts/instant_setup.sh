@@ -9,30 +9,30 @@ source .env
 [ -n "$TELEGRAM_BOT_TOKEN" ] && [ -n "$TELEGRAM_ALLOWED_USER_ID" ] || { echo "❌ Заполни .env"; exit 1; }
 REPO=$(gh repo view --json nameWithOwner -q .nameWithOwner)
 OWNER=${REPO%%/*}
-W="npx -y wrangler@4"
+W() { npx -y wrangler@4 "$@"; }
 cd worker
 
 echo "☁️  1/6 Вход в Cloudflare"
-$W whoami 2>/dev/null | grep -q "You are logged in" || $W login
+W whoami 2>/dev/null | grep -q "You are logged in" || W login
 
 echo "🗄  2/6 Очередь (D1)"
-DB_ID=$($W d1 list --json 2>/dev/null | uv run --no-project python -c "import json,sys; print(next((d['uuid'] for d in json.load(sys.stdin) if d['name']=='stash-queue'), ''))")
+DB_ID=$(W d1 list --json 2>/dev/null | uv run --no-project python -c "import json,sys; print(next((d['uuid'] for d in json.load(sys.stdin) if d['name']=='stash-queue'), ''))")
 if [ -z "$DB_ID" ]; then
-  $W d1 create stash-queue >/dev/null
-  DB_ID=$($W d1 list --json | uv run --no-project python -c "import json,sys; print(next(d['uuid'] for d in json.load(sys.stdin) if d['name']=='stash-queue'))")
+  W d1 create stash-queue >/dev/null
+  DB_ID=$(W d1 list --json | uv run --no-project python -c "import json,sys; print(next(d['uuid'] for d in json.load(sys.stdin) if d['name']=='stash-queue'))")
 fi
 sed "s/__DB_ID__/$DB_ID/" wrangler.toml.template > wrangler.toml
-$W d1 execute stash-queue --remote --file schema.sql -y >/dev/null
+W d1 execute stash-queue --remote --file schema.sql -y >/dev/null
 
 echo "🚀 3/6 Выкладываю Worker"
-URL=$($W deploy 2>&1 | grep -oE 'https://[a-zA-Z0-9.-]+\.workers\.dev' | head -1)
+URL=$(W deploy 2>&1 | grep -oE 'https://[a-zA-Z0-9.-]+\.workers\.dev' | head -1)
 [ -n "$URL" ] || { echo "❌ Не удалось получить адрес Worker"; exit 1; }
 echo "   $URL"
 
 echo "🔐 4/6 Секреты Worker"
 WEBHOOK_SECRET=$(openssl rand -hex 32)
 QUEUE_SECRET=$(openssl rand -hex 32)
-put() { printf %s "$2" | $W secret put "$1" >/dev/null; }
+put() { printf %s "$2" | W secret put "$1" >/dev/null; }
 put TELEGRAM_BOT_TOKEN "$TELEGRAM_BOT_TOKEN"
 put OWNER_ID "$TELEGRAM_ALLOWED_USER_ID"
 put WEBHOOK_SECRET "$WEBHOOK_SECRET"
