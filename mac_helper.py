@@ -21,6 +21,7 @@ load_dotenv(ROOT / ".env")
 import agent  # noqa: E402
 import crypto_store  # noqa: E402
 import persona as P  # noqa: E402
+import tgfmt  # noqa: E402
 from telegram import Bot  # noqa: E402
 
 BRANCH = "norka-data"
@@ -75,8 +76,7 @@ async def main() -> None:
                 status, report = await agent.install(it)
             except Exception as e:  # noqa: BLE001
                 status, report = "failed", str(e)
-            text = f"{P.install_head(status)} · #{it['id']} {it.get('title') or ''}\n\n{report}"
-            await tg.send_message(chat, text[:3900])
+            await tgfmt.send_md(tg, chat, f"**{P.install_head(status)} · #{it['id']} {it.get('title') or ''}**\n\n{report}")
             push_result(f"{it['id']}-{dt.datetime.now():%Y%m%d%H%M%S}.json.enc",
                         {"id": it["id"], "approved_at": it.get("approved_at"),
                          "status": status, "report": report})

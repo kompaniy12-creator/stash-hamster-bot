@@ -20,6 +20,7 @@ from telegram.ext import (
 
 load_dotenv(Path(__file__).parent / ".env")
 
+import tgfmt  # noqa: E402
 import agent  # noqa: E402  (после load_dotenv, чтобы подхватить AGENT_MODEL)
 import persona as P  # noqa: E402
 import storage  # noqa: E402
@@ -68,25 +69,31 @@ def clip(s: str, n: int = MAX_LEN) -> str:
     return s if len(s) <= n else s[: n - 20] + "\n…(обрезано)"
 
 
+def _risk_icon(risk: str) -> str:
+    r = (risk or "").lower()
+    return "🔴" if r.startswith("high") else "🟡" if r.startswith("medium") else "🟢" if r.startswith("low") else "⚪️"
+
+
 def card(item: dict) -> str:
-    lines = [f"#{item['id']} · {item.get('title') or 'без названия'}"]
-    if item.get("kind"):
-        lines.append(f"Тип: {item['kind']}")
-    lines.append(f"Статус: {storage.STATUSES.get(item['status'], item['status'])}")
+    """Карточка запаса в markdown (отправляется через tgfmt.send_md)."""
+    one = lambda x: " ".join(str(x).split())  # noqa: E731
+    lines = [f"**#{item['id']} · {one(item.get('title') or 'без названия')}**"]
+    meta = [x for x in (item.get("kind"), storage.STATUSES.get(item["status"], item["status"])) if x]
+    lines.append(" · ".join(meta))
     if item.get("summary"):
-        lines += ["", item["summary"]]
+        lines += ["", one(item["summary"])]
     if item.get("install_plan"):
         try:
             plan = json.loads(item["install_plan"])
         except json.JSONDecodeError:
             plan = [item["install_plan"]]
-        lines += ["", "План установки:"] + [f"{i}. {s}" for i, s in enumerate(plan, 1)]
+        lines += ["", "**План установки**"] + [f"{i}. {one(step)}" for i, step in enumerate(plan, 1)]
     if item.get("risk"):
-        lines += ["", f"Риск: {item['risk']}"]
+        lines += ["", f"**Риск** {_risk_icon(item['risk'])} {one(item['risk'])}"]
     tail = [x for x in (item.get("comment"), P.card_footer(item["status"])) if x]
     if tail:
         lines += ["", "🐹 " + " ".join(tail).removeprefix("🐹 ")]
-    return clip("\n".join(lines))
+    return "\n".join(lines)
 
 
 def buttons(item: dict) -> InlineKeyboardMarkup | None:
@@ -131,7 +138,7 @@ async def run_analysis(item_id: int, chat_id: int, msg_id: int, ctx: ContextType
         )
         return
     item = storage.get(item_id)
-    await ctx.bot.edit_message_text(card(item), chat_id, msg_id, reply_markup=buttons(item))
+    await tgfmt.send_md(ctx.bot, chat_id, card(item), reply_markup=buttons(item), edit_message_id=msg_id)
 
 
 async def run_install(item_id: int, chat_id: int, ctx: ContextTypes.DEFAULT_TYPE):
@@ -149,7 +156,8 @@ async def run_install(item_id: int, chat_id: int, ctx: ContextTypes.DEFAULT_TYPE
     storage.update(item_id, status=status, log=report)
     item = storage.get(item_id)
     head = P.install_head(status)
-    await msg.edit_text(clip(f"{head} · #{item_id} {item.get('title') or ''}\n\n{report}"),
+    await tgfmt.send_md(ctx.bot, chat_id, f"**{head} · #{item_id} {item.get('title') or ''}**\n\n{report}",
+                        edit_message_id=msg.message_id,
                         reply_markup=buttons(item))
 
 
@@ -241,7 +249,7 @@ async def cmd_show(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     if not item:
         await update.message.reply_text("🐹 Какой номер-то? Пиши так: /show 3")
         return
-    await update.message.reply_text(card(item), reply_markup=buttons(item))
+    await tgfmt.send_md(ctx.bot, update.effective_chat.id, card(item), reply_markup=buttons(item))
 
 
 async def cmd_install(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
@@ -280,7 +288,7 @@ async def on_button(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         await q.message.reply_text(P.later(item_id))
     elif action == "skip":
         storage.update(item_id, status="skipped")
-        await q.edit_message_text(card(storage.get(item_id)))
+        await q.edit_message_reply_markup(None)
         await q.message.reply_text(P.skipped())
 
 
