@@ -8,7 +8,7 @@ import re
 from pathlib import Path
 
 from dotenv import load_dotenv
-from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
+from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update, WebAppInfo
 from telegram.ext import (
     Application,
     CallbackQueryHandler,
@@ -82,6 +82,11 @@ def card(item: dict) -> str:
     lines.append(" · ".join(meta))
     if item.get("summary"):
         lines += ["", one(item["summary"])]
+    can = item.get("can")
+    if isinstance(can, str):
+        can = json.loads(can or "[]")
+    if can:
+        lines += ["", "**Что умеет**"] + [f"- {one(c)}" for c in can]
     if item.get("install_plan"):
         try:
             plan = json.loads(item["install_plan"])
@@ -128,6 +133,8 @@ async def run_analysis(item_id: int, chat_id: int, msg_id: int, ctx: ContextType
             can_auto_install=int(bool(res.get("can_auto_install"))),
             risk=res.get("risk"),
             comment=res.get("hamster_comment"),
+            can=res.get("can") or [],
+            install_names=res.get("install_names") or [],
             status=status,
         )
     except Exception as e:  # noqa: BLE001
@@ -260,6 +267,31 @@ async def cmd_install(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     spawn(ctx, run_install(i, update.effective_chat.id, ctx))
 
 
+async def cmd_skip(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    i = _arg_id(ctx)
+    if not i or not storage.get(i):
+        await update.message.reply_text("🐹 Какой номер-то? Пиши так: /skip 3")
+        return
+    storage.update(i, status="skipped")
+    await update.message.reply_text(P.skipped() + f" (#{i})")
+
+
+def dashboard_url() -> str | None:
+    base = os.getenv("STASH_QUEUE_URL", "").rstrip("/")
+    return f"{base}/app" if base else None
+
+
+async def cmd_app(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    url = dashboard_url()
+    if not url:
+        await update.message.reply_text("🐹 Норка-приложение работает только в мгновенном режиме (Cloudflare Worker).")
+        return
+    await update.message.reply_text(
+        "🏠 Вот моя норка: всё, что стоит на Mac, и всё, что ждёт в щеках.",
+        reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🐹 Открыть норку", web_app=WebAppInfo(url))]]),
+    )
+
+
 async def cmd_reanalyze(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     i = _arg_id(ctx)
     if not i or not storage.get(i):
@@ -339,6 +371,8 @@ def build_app() -> Application:
     app.add_handler(CommandHandler("show", cmd_show, filters=OWNER))
     app.add_handler(CommandHandler("install", cmd_install, filters=OWNER))
     app.add_handler(CommandHandler("reanalyze", cmd_reanalyze, filters=OWNER))
+    app.add_handler(CommandHandler("skip", cmd_skip, filters=OWNER))
+    app.add_handler(CommandHandler("app", cmd_app, filters=OWNER))
     app.add_error_handler(on_error)
     app.add_handler(CallbackQueryHandler(on_button))
     app.add_handler(MessageHandler(

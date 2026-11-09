@@ -6,7 +6,9 @@
 """
 import asyncio
 import datetime as dt
+import hashlib
 import json
+import re
 import os
 import sys
 from pathlib import Path
@@ -28,7 +30,7 @@ import persona as P  # noqa: E402
 import storage  # noqa: E402
 
 RESULTS_DIR = Path(os.getenv("STASH_RESULTS", "norka/results"))
-COMMANDS_VERSION = 2  # поднять, если поменялся список команд
+COMMANDS_VERSION = 3  # поднять, если поменялся список команд или кнопка меню
 
 
 def ingest_results(tg_bot) -> int:
@@ -86,27 +88,72 @@ async def confirm(ids: list[int]) -> None:
                          headers={"authorization": f"Bearer {QUEUE_SECRET}"})
 
 
+def catalog_snapshot() -> dict:
+    items = []
+    for it in storage.list_items(limit=1000):
+        try:
+            plan = json.loads(it.get("install_plan") or "[]")
+        except ValueError:
+            plan = [it["install_plan"]]
+        names = it.get("install_names") or []
+        if isinstance(names, str):
+            names = json.loads(names or "[]")
+        can = it.get("can") or []
+        if isinstance(can, str):
+            can = json.loads(can or "[]")
+        title = it.get("title") or ""
+        names = sorted({n.lower() for n in names} | {w.lower() for w in re.findall(r"[a-z0-9][a-z0-9_.-]+[a-z0-9]", title, re.I) if "-" in w})
+        items.append({"id": it["id"], "title": title, "kind": it.get("kind"), "summary": it.get("summary"),
+                      "plan": plan, "risk": it.get("risk"), "status": it["status"], "comment": it.get("comment"),
+                      "can": can, "names": names, "created_at": it.get("created_at"),
+                      "report": (it.get("log") or "")[:4000] if it["status"] != "ready" else None})
+    return {"items": items}
+
+
+async def push_catalog() -> None:
+    """Отдать каталог дашборду (только если изменился)."""
+    if not QUEUE_URL:
+        return
+    body = json.dumps(catalog_snapshot(), ensure_ascii=False, sort_keys=True)
+    sha = hashlib.sha256(body.encode()).hexdigest()
+    if storage.meta_get("dash_sha") == sha:
+        return
+    async with httpx.AsyncClient(timeout=20) as c:
+        r = await c.post(f"{QUEUE_URL}/snapshot/catalog", content=body.encode(),
+                         headers={"authorization": f"Bearer {QUEUE_SECRET}", "content-type": "application/json"})
+    if r.status_code == 200:
+        storage.meta_set("dash_sha", sha)
+
+
 async def main() -> None:
     app = bot.build_app()
     await app.initialize()
     try:
         if storage.meta_get("commands_version") != COMMANDS_VERSION:
             await app.bot.set_my_commands(P.COMMANDS)
+            if bot.dashboard_url():
+                from telegram import MenuButtonWebApp, WebAppInfo
+                await app.bot.set_chat_menu_button(chat_id=bot.OWNER_ID, menu_button=MenuButtonWebApp(
+                    "🐹 Норка", WebAppInfo(bot.dashboard_url())))
             storage.meta_set("commands_version", COMMANDS_VERSION)
 
         got = ingest_results(app.bot)
         updates, queue_ids = await fetch_updates(app.bot)
-        done_before = storage.meta_get("tg_offset") or 0
+        seen = set(storage.meta_get("seen_updates") or [])
         for u in sorted(updates, key=lambda x: x.update_id):
-            if u.update_id < done_before:
+            if u.update_id in seen:
                 continue  # уже обработан в прошлом прогоне
-            storage.meta_set("tg_offset", u.update_id + 1)  # сначала сдвигаем: упавшее сообщение не зациклится
+            seen.add(u.update_id)  # сначала отмечаем: упавшее сообщение не зациклится
+            storage.meta_set("seen_updates", sorted(seen, key=abs)[-500:])
+            if u.update_id > 0:
+                storage.meta_set("tg_offset", u.update_id + 1)
             await app.process_update(u)
         await confirm(queue_ids)
         while bot.PENDING:  # разборы, запущенные хендлерами
             batch, bot.PENDING[:] = bot.PENDING[:], []
             await asyncio.gather(*batch, return_exceptions=True)
         await reminders(app.bot)
+        await push_catalog()
         print(f"updates={len(updates)} results={got}")
     finally:
         await app.shutdown()

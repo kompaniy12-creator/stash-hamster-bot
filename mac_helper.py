@@ -24,6 +24,9 @@ import persona as P  # noqa: E402
 import tgfmt  # noqa: E402
 from telegram import Bot  # noqa: E402
 
+# ключ дашборда читаем сразу: agent.scrub_env() потом уберёт секреты из окружения
+DASH_SECRET = os.getenv("STASH_DASH_SECRET", "")
+os.environ.pop("STASH_DASH_SECRET", None)
 BRANCH = "norka-data"
 WT = ROOT / "data" / "norka-sync"
 DONE = ROOT / "data" / "helper_done.json"
@@ -84,6 +87,34 @@ async def main() -> None:
             DONE.write_text(json.dumps(sorted(done)))
 
 
+INV_SHA = ROOT / "data" / "inventory.sha"
+
+
+async def push_inventory() -> None:
+    """Опись установленного → дашборд (только если что-то поменялось)."""
+    url = os.getenv("STASH_DASH_URL", "").rstrip("/")
+    secret = DASH_SECRET
+    if not url or not secret:
+        return
+    import hashlib
+
+    import httpx
+
+    import inventory
+    raw = inventory.collect()
+    base_sha = hashlib.sha256(json.dumps(raw, sort_keys=True).encode()).hexdigest()
+    if INV_SHA.exists() and INV_SHA.read_text() == base_sha:
+        return
+    inv = await inventory.enrich(raw)
+    async with httpx.AsyncClient(timeout=30) as c:
+        r = await c.post(f"{url}/snapshot/inventory", content=json.dumps(inv, ensure_ascii=False).encode(),
+                         headers={"authorization": f"Bearer {secret}", "content-type": "application/json"})
+    if r.status_code == 200:
+        INV_SHA.write_text(base_sha)
+    else:
+        print(f"inventory push failed: {r.status_code}")
+
+
 if __name__ == "__main__":
     LOCK.parent.mkdir(parents=True, exist_ok=True)
     with open(LOCK, "w") as lock:
@@ -92,3 +123,4 @@ if __name__ == "__main__":
         except BlockingIOError:
             sys.exit(0)  # предыдущий запуск ещё ставит
         asyncio.run(main())
+        asyncio.run(push_inventory())

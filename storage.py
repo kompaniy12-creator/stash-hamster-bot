@@ -24,7 +24,7 @@ STATUSES = {
 }
 
 FIELDS = ("title", "kind", "summary", "install_plan", "can_auto_install", "risk",
-          "log", "comment", "last_nudged", "approved_at")
+          "log", "comment", "last_nudged", "approved_at", "can", "install_names")
 
 
 def _now() -> str:

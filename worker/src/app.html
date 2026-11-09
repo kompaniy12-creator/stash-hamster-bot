@@ -1,0 +1,344 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Норка Стэша</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<style>
+  :root {
+    --bg: var(--tg-theme-bg-color, #ffffff);
+    --bg2: var(--tg-theme-secondary-bg-color, #f2f2f6);
+    --text: var(--tg-theme-text-color, #121212);
+    --hint: var(--tg-theme-hint-color, #8a8a8e);
+    --link: var(--tg-theme-link-color, #2a7de1);
+    --btn: var(--tg-theme-button-color, #2a7de1);
+    --btn-text: var(--tg-theme-button-text-color, #ffffff);
+    --card: var(--tg-theme-section-bg-color, var(--bg));
+    --sep: color-mix(in srgb, var(--hint) 22%, transparent);
+    --acorn: #e8902a;
+    --acorn-soft: color-mix(in srgb, #e8902a 16%, transparent);
+    --green: #2fae5f; --yellow: #d9a514; --red: #e5484d;
+    --r: 14px;
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; background: var(--bg2); color: var(--text);
+    font: 15px/1.4 -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, sans-serif; }
+  body { padding: 0 0 calc(24px + env(safe-area-inset-bottom)); }
+  .wrap { max-width: 720px; margin: 0 auto; padding: 0 12px; }
+
+  header { padding: 18px 4px 10px; display: flex; gap: 14px; align-items: center; }
+  .ava { width: 56px; height: 56px; border-radius: 50%; background: var(--acorn-soft);
+    display: grid; place-items: center; font-size: 32px; flex: none; }
+  .ttl { font-size: 20px; font-weight: 700; letter-spacing: -.2px; }
+  .rank { color: var(--hint); font-size: 13px; margin-top: 2px; }
+
+  .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin: 6px 0 12px; }
+  .stat { background: var(--card); border-radius: var(--r); padding: 10px 12px; }
+  .stat b { display: block; font-size: 22px; font-variant-numeric: tabular-nums; }
+  .stat span { color: var(--hint); font-size: 12px; }
+
+  .search { position: sticky; top: 0; z-index: 5; background: var(--bg2); padding: 6px 0 8px; }
+  .search input { width: 100%; border: 0; outline: 0; border-radius: 12px; padding: 10px 12px 10px 36px;
+    background: var(--card) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='none' stroke='%238a8a8e' stroke-width='2'%3E%3Ccircle cx='7' cy='7' r='5'/%3E%3Cpath d='m11 11 4 4'/%3E%3C/svg%3E") 12px 50% no-repeat;
+    color: var(--text); font-size: 15px; }
+  .tabs { display: flex; gap: 6px; margin-top: 8px; overflow-x: auto; scrollbar-width: none; }
+  .tabs::-webkit-scrollbar { display: none; }
+  .tab { border: 0; border-radius: 999px; padding: 7px 13px; background: var(--card); color: var(--text);
+    font-size: 14px; white-space: nowrap; cursor: pointer; }
+  .tab[aria-selected="true"] { background: var(--btn); color: var(--btn-text); }
+  .tab .n { opacity: .65; margin-left: 4px; font-variant-numeric: tabular-nums; }
+
+  h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .4px; color: var(--hint);
+    font-weight: 600; margin: 18px 6px 8px; }
+  .list { background: var(--card); border-radius: var(--r); overflow: hidden; }
+  .item { border-top: 1px solid var(--sep); }
+  .item:first-child { border-top: 0; }
+  .row { display: flex; gap: 12px; padding: 12px 14px; cursor: pointer; align-items: flex-start; }
+  .ico { width: 36px; height: 36px; border-radius: 10px; display: grid; place-items: center; font-size: 19px;
+    background: var(--acorn-soft); flex: none; }
+  .main { min-width: 0; flex: 1; }
+  .name { font-weight: 600; overflow-wrap: anywhere; }
+  .why { color: var(--hint); font-size: 13.5px; margin-top: 2px;
+    display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  .open .why { -webkit-line-clamp: unset; display: block; }
+  .tags { display: flex; gap: 5px; flex-wrap: wrap; margin-top: 6px; }
+  .tag { font-size: 11.5px; padding: 2px 7px; border-radius: 6px; background: var(--bg2); color: var(--hint); }
+  .tag.st { background: var(--acorn-soft); color: var(--acorn); }
+  .chev { color: var(--hint); transition: transform .2s; margin-top: 8px; flex: none; }
+  .open .chev { transform: rotate(90deg); }
+
+  .det { display: none; padding: 0 14px 14px 62px; font-size: 14px; }
+  .open .det { display: block; }
+  .det h4 { margin: 12px 0 4px; font-size: 12.5px; color: var(--hint); font-weight: 600;
+    text-transform: uppercase; letter-spacing: .3px; }
+  .det ul, .det ol { margin: 0; padding-left: 18px; }
+  .det li { margin: 3px 0; }
+  .det p { margin: 0; }
+  code { font: 12.5px/1.4 ui-monospace, "SF Mono", Menlo, monospace; background: var(--bg2);
+    padding: 1px 5px; border-radius: 5px; overflow-wrap: anywhere; cursor: copy; }
+  .risk { display: inline-flex; gap: 6px; align-items: baseline; }
+  .dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; flex: none; transform: translateY(-1px); }
+  .orig { color: var(--hint); font-size: 13px; }
+  .comment { margin-top: 10px; padding: 8px 10px; border-radius: 10px; background: var(--acorn-soft); }
+  .acts { display: flex; gap: 8px; margin-top: 12px; flex-wrap: wrap; }
+  .b { border: 0; border-radius: 10px; padding: 9px 14px; font-size: 14px; font-weight: 600; cursor: pointer; }
+  .b.pri { background: var(--btn); color: var(--btn-text); }
+  .b.sec { background: var(--bg2); color: var(--text); }
+  .b:disabled { opacity: .5; }
+  .sub { margin-top: 6px; border-left: 2px solid var(--sep); padding-left: 10px; }
+  .sub .s { margin: 6px 0; }
+  .sub .s b { font-weight: 600; }
+
+  .empty { text-align: center; color: var(--hint); padding: 40px 20px; }
+  .empty .big { font-size: 42px; }
+  .foot { color: var(--hint); font-size: 12px; text-align: center; margin-top: 18px; }
+  .toast { position: fixed; left: 50%; bottom: calc(18px + env(safe-area-inset-bottom)); transform: translateX(-50%);
+    background: var(--text); color: var(--bg); padding: 9px 14px; border-radius: 12px; font-size: 14px;
+    opacity: 0; transition: opacity .2s; pointer-events: none; max-width: 90vw; }
+  .toast.on { opacity: .92; }
+  .skel { height: 64px; border-radius: var(--r); background: var(--card); margin: 8px 0; opacity: .6; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="ava">🐹</div>
+    <div><div class="ttl">Норка Стэша</div><div class="rank" id="rank">Пересчитываю запасы…</div></div>
+  </header>
+  <div class="stats" id="stats"></div>
+  <div class="search">
+    <input id="q" type="search" placeholder="Найти в норке" autocomplete="off">
+    <div class="tabs" role="tablist" id="tabs"></div>
+  </div>
+  <main id="out"><div class="skel"></div><div class="skel"></div><div class="skel"></div></main>
+  <div class="foot" id="foot"></div>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+const tg = window.Telegram && window.Telegram.WebApp;
+if (tg) { tg.ready(); tg.expand(); }
+const $ = (s) => document.querySelector(s);
+const state = { tab: "wait", q: "", data: null, open: new Set() };
+
+function h(tag, attrs, ...kids) {
+  const el = document.createElement(tag);
+  for (const [k, v] of Object.entries(attrs || {})) {
+    if (v == null || v === false) continue;
+    if (k === "class") el.className = v;
+    else if (k.startsWith("on")) el.addEventListener(k.slice(2), v);
+    else el.setAttribute(k, v);
+  }
+  for (const kid of kids.flat()) if (kid != null && kid !== false) el.append(kid.nodeType ? kid : String(kid));
+  return el;
+}
+
+// `код` и **жирный** в тексте — безопасно, через узлы DOM
+function rich(text) {
+  const out = [];
+  String(text || "").split(/(`[^`]+`)/).forEach((part) => {
+    if (/^`[^`]+`$/.test(part)) {
+      const code = part.slice(1, -1);
+      out.push(h("code", { title: "Нажми, чтобы скопировать", onclick: (e) => { e.stopPropagation(); copy(code); } }, code));
+    } else {
+      part.split(/(\*\*[^*]+\*\*)/).forEach((p) => out.push(/^\*\*.+\*\*$/.test(p) ? h("b", {}, p.slice(2, -2)) : p));
+    }
+  });
+  return out;
+}
+
+function toast(msg) {
+  const t = $("#toast"); t.textContent = msg; t.classList.add("on");
+  clearTimeout(toast.t); toast.t = setTimeout(() => t.classList.remove("on"), 2200);
+}
+async function copy(text) {
+  try { await navigator.clipboard.writeText(text); toast("Скопировано 🌰"); tg?.HapticFeedback?.selectionChanged(); }
+  catch { toast("Не удалось скопировать"); }
+}
+
+const KIND = {
+  "claude-skill": ["🧠", "скилл"], "claude-plugin": ["🧩", "плагин"], "mcp-server": ["🔌", "MCP"],
+  "cli-tool": ["⌨️", "CLI"], "library": ["📚", "библиотека"], "saas-service": ["☁️", "сервис"],
+  "prompt/guide": ["📝", "гайд"], other: ["📦", "другое"],
+};
+const STATUS = {
+  new: "🆕 новый", analyzing: "🔎 изучаю", ready: "📥 можно ставить", manual: "✋ вручную",
+  approved: "🚚 ждёт Mac", installing: "⚙️ ставится", installed: "✅ стоит", failed: "❌ не вышло", skipped: "💨 выплюнут",
+};
+const WAIT = ["new", "analyzing", "ready", "manual", "approved", "installing", "failed"];
+function kindOf(k) {
+  const key = String(k || "other").toLowerCase();
+  return KIND[key] || KIND[Object.keys(KIND).find((x) => key.includes(x.split("-")[0])) || "other"];
+}
+function riskColor(r) {
+  const s = String(r || "").toLowerCase();
+  return s.startsWith("high") ? "var(--red)" : s.startsWith("medium") ? "var(--yellow)" : s.startsWith("low") ? "var(--green)" : "var(--hint)";
+}
+function rank(n) {
+  return n >= 50 ? "👑 Легенда норки" : n >= 30 ? "🏰 Хомяк-магнат" : n >= 15 ? "📦 Главный кладовщик" : n >= 5 ? "🌰 Запасливый" : "🐣 Хомячок-новичок";
+}
+const match = (...fields) => !state.q || fields.join(" ").toLowerCase().includes(state.q);
+function ago(ts) {
+  if (!ts) return "никогда";
+  const m = Math.round((Date.now() - ts) / 60000);
+  return m < 1 ? "только что" : m < 60 ? `${m} мин назад` : m < 1440 ? `${Math.round(m / 60)} ч назад` : `${Math.round(m / 1440)} дн назад`;
+}
+
+function itemNode(key, { icon, title, why, tags, details }) {
+  const open = state.open.has(key);
+  const node = h("div", { class: "item" + (open ? " open" : "") },
+    h("div", { class: "row", role: "button", "aria-expanded": String(open), onclick: () => {
+      state.open.has(key) ? state.open.delete(key) : state.open.add(key);
+      node.classList.toggle("open"); tg?.HapticFeedback?.selectionChanged();
+    } },
+      h("div", { class: "ico" }, icon),
+      h("div", { class: "main" },
+        h("div", { class: "name" }, title),
+        why ? h("div", { class: "why" }, ...rich(why)) : null,
+        tags && tags.length ? h("div", { class: "tags" }, tags) : null),
+      h("div", { class: "chev" }, "›")),
+    h("div", { class: "det" }, details));
+  return node;
+}
+const sect = (title, nodes) => nodes.length ? [h("h2", {}, title), h("div", { class: "list" }, nodes)] : [];
+const canList = (can) => can && can.length ? [h("h4", {}, "Что умеет"), h("ul", {}, can.map((c) => h("li", {}, ...rich(c))))] : [];
+
+async function act(item, action, btn) {
+  btn.disabled = true;
+  try {
+    const r = await fetch("/api/action", { method: "POST", headers: { "content-type": "application/json" },
+      body: JSON.stringify({ initData: tg?.initData || "", id: item.id, action }) });
+    if (!r.ok) throw new Error(r.status);
+    tg?.HapticFeedback?.notificationOccurred("success");
+    item.status = action === "install" ? "approved" : "skipped";
+    toast(action === "install" ? "🐹 Передал хомяку — он отпишется в чате" : "💨 Выплюнул");
+    render();
+  } catch (e) {
+    btn.disabled = false; tg?.HapticFeedback?.notificationOccurred("error"); toast("Не получилось, попробуй ещё раз");
+  }
+}
+
+function catalogNode(it) {
+  const [icon, kind] = kindOf(it.kind);
+  const plan = it.plan || [];
+  const details = [];
+  if (it.summary) details.push(h("h4", {}, "Зачем"), h("p", {}, ...rich(it.summary)));
+  details.push(...canList(it.can));
+  if (plan.length) details.push(h("h4", {}, it.status === "manual" ? "Инструкция (руками)" : "План установки"),
+    h("ol", {}, plan.map((s) => h("li", {}, ...rich(s)))));
+  if (it.risk) details.push(h("h4", {}, "Риск"),
+    h("div", { class: "risk" }, h("span", { class: "dot", style: `background:${riskColor(it.risk)}` }), h("span", {}, ...rich(it.risk))));
+  if (it.report && it.status !== "ready") details.push(h("h4", {}, "Отчёт грузчика"), h("p", { class: "orig" }, ...rich(it.report)));
+  if (it.comment) details.push(h("div", { class: "comment" }, "🐹 ", ...rich(it.comment)));
+  if (["ready", "manual", "failed"].includes(it.status)) {
+    details.push(h("div", { class: "acts" },
+      h("button", { class: "b pri", onclick: (e) => act(it, "install", e.currentTarget) }, it.status === "failed" ? "🔁 Ещё попытка" : "🐹 Установить"),
+      h("button", { class: "b sec", onclick: (e) => act(it, "skip", e.currentTarget) }, "💨 Выплюнуть")));
+  }
+  return itemNode(`c${it.id}`, {
+    icon, title: `${it.title || "без названия"}`,
+    why: it.summary,
+    tags: [h("span", { class: "tag st" }, STATUS[it.status] || it.status), h("span", { class: "tag" }, kind), h("span", { class: "tag" }, `#${it.id}`)],
+    details,
+  });
+}
+
+function skillNode(s, prefix) {
+  return itemNode(`${prefix}${s.name}`, {
+    icon: "🧠", title: s.name, why: s.why || s.description,
+    tags: [s.by_stash ? h("span", { class: "tag st" }, "🐹 принёс Стэш") : null, s.source && s.source !== "личные" ? h("span", { class: "tag" }, s.source) : null].filter(Boolean),
+    details: [...canList(s.can), s.description ? [h("h4", {}, "Оригинальное описание"), h("p", { class: "orig" }, s.description)] : []],
+  });
+}
+
+function pluginNode(p) {
+  const subs = (p.skills || []).filter((s) => match(s.name, s.description, s.why));
+  return itemNode(`p${p.name}`, {
+    icon: "🧩", title: p.name, why: p.why || p.description,
+    tags: [p.by_stash ? h("span", { class: "tag st" }, "🐹 принёс Стэш") : null,
+      p.version ? h("span", { class: "tag" }, `v${p.version}`) : null,
+      p.skills?.length ? h("span", { class: "tag" }, `${p.skills.length} скиллов`) : null,
+      p.commands?.length ? h("span", { class: "tag" }, `${p.commands.length} команд`) : null].filter(Boolean),
+    details: [
+      ...canList(p.can),
+      subs.length ? [h("h4", {}, "Скиллы внутри"), h("div", { class: "sub" }, subs.map((s) =>
+        h("div", { class: "s" }, h("b", {}, s.name), s.why || s.description ? [h("br"), h("span", { class: "orig" }, s.why || s.description)] : [])))] : [],
+      p.commands?.length ? [h("h4", {}, "Команды"), h("div", { class: "tags" }, p.commands.map((c) => h("code", { onclick: () => copy(`/${p.name}:${c}`) }, `/${c}`)))] : [],
+      p.description && p.why ? [h("h4", {}, "Оригинальное описание"), h("p", { class: "orig" }, p.description)] : [],
+      p.marketplace ? h("p", { class: "orig", style: "margin-top:10px" }, `Маркетплейс: ${p.marketplace}`) : null,
+    ],
+  });
+}
+
+function render() {
+  const d = state.data || {};
+  const items = d.catalog?.data?.items || [];
+  const inv = d.inventory?.data || { skills: [], plugins: [], mcp: [] };
+  const stashTitles = new Set(items.filter((i) => i.status === "installed").flatMap((i) => (i.names || [])).map((x) => x.toLowerCase()));
+  inv.skills.forEach((s) => (s.by_stash = stashTitles.has(s.name.toLowerCase())));
+  inv.plugins.forEach((p) => (p.by_stash = stashTitles.has(p.name.toLowerCase())));
+
+  const wait = items.filter((i) => WAIT.includes(i.status));
+  const skipped = items.filter((i) => i.status === "skipped");
+  const installedCount = inv.skills.length + inv.plugins.length + inv.mcp.length;
+
+  $("#rank").textContent = `${rank(items.length)} · натаскано ${items.length}`;
+  $("#stats").replaceChildren(
+    h("div", { class: "stat" }, h("b", {}, installedCount), h("span", {}, "стоит на Mac")),
+    h("div", { class: "stat" }, h("b", {}, wait.length), h("span", {}, "ждут в щеках")),
+    h("div", { class: "stat" }, h("b", {}, skipped.length), h("span", {}, "выплюнуто")));
+
+  const tabs = [["wait", "🌰 Ждут", wait.length], ["inst", "✅ Установлено", installedCount], ["skip", "💨 Выплюнуто", skipped.length]];
+  $("#tabs").replaceChildren(...tabs.map(([k, label, n]) => h("button", { class: "tab", role: "tab", "aria-selected": String(state.tab === k),
+    onclick: () => { state.tab = k; tg?.HapticFeedback?.selectionChanged(); render(); } }, label, h("span", { class: "n" }, n))));
+
+  let nodes = [];
+  if (state.tab === "wait") {
+    const list = wait.filter((i) => match(i.title, i.summary, i.kind, i.plan?.join(" ")));
+    const order = (i) => ["ready", "failed", "manual", "approved", "installing", "analyzing", "new"].indexOf(i.status);
+    list.sort((a, b) => order(a) - order(b) || b.id - a.id);
+    nodes = [
+      ...sect("Можно ставить", list.filter((i) => ["ready", "failed"].includes(i.status)).map(catalogNode)),
+      ...sect("Ставить руками", list.filter((i) => i.status === "manual").map(catalogNode)),
+      ...sect("В работе", list.filter((i) => ["approved", "installing", "analyzing", "new"].includes(i.status)).map(catalogNode)),
+    ];
+    if (!nodes.length) nodes = [h("div", { class: "empty" }, h("div", { class: "big" }, "🐹"), state.q ? "Ничего не нашёл" : "Щёки пустые, всё разложено! Кидай мне ещё добычу в чат.")];
+  } else if (state.tab === "inst") {
+    nodes = [
+      ...sect("Плагины", inv.plugins.filter((p) => match(p.name, p.description, p.why, (p.skills || []).map((s) => s.name + " " + (s.why || "")).join(" "))).map(pluginNode)),
+      ...sect("Личные скиллы", inv.skills.filter((s) => match(s.name, s.description, s.why)).map((s) => skillNode(s, "s"))),
+      ...sect("MCP-серверы", inv.mcp.filter((m) => match(m.name, m.why)).map((m) => itemNode(`m${m.name}`, {
+        icon: "🔌", title: m.name, why: m.why || `Подключён через ${m.transport}`, tags: [h("span", { class: "tag" }, m.transport)], details: canList(m.can) }))),
+    ];
+    if (!d.inventory) nodes = [h("div", { class: "empty" }, h("div", { class: "big" }, "🚚"), "Грузчик на Mac ещё не прислал опись. Она появится, когда Mac будет включён.")];
+    else if (!nodes.length) nodes = [h("div", { class: "empty" }, h("div", { class: "big" }, "🔎"), "Ничего не нашёл")];
+  } else {
+    nodes = sect("Выплюнуто", skipped.filter((i) => match(i.title, i.summary)).map(catalogNode));
+    if (!nodes.length) nodes = [h("div", { class: "empty" }, h("div", { class: "big" }, "💨"), "Ничего не выплюнуто")];
+  }
+  $("#out").replaceChildren(...nodes);
+  $("#foot").textContent = `Каталог обновлён ${ago(d.catalog?.updated)} · опись Mac ${ago(d.inventory?.updated)}`;
+}
+
+$("#q").addEventListener("input", (e) => { state.q = e.target.value.trim().toLowerCase(); render(); });
+
+async function load() {
+  if (!tg || !tg.initData) {
+    $("#out").replaceChildren(h("div", { class: "empty" }, h("div", { class: "big" }, "🔒"), "Норку можно открыть только из Telegram, через кнопку у бота."));
+    return;
+  }
+  try {
+    const r = await fetch("/api/data", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ initData: tg.initData }) });
+    if (r.status === 403) throw new Error("Это не твоя норка 🐹");
+    if (!r.ok) throw new Error("Хомяк не отвечает, попробуй позже");
+    state.data = await r.json();
+    render();
+  } catch (e) {
+    $("#out").replaceChildren(h("div", { class: "empty" }, h("div", { class: "big" }, "😵"), e.message));
+  }
+}
+load();
+</script>
+</body>
+</html>

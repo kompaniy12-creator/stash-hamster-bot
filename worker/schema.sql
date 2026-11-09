@@ -4,3 +4,9 @@ CREATE TABLE IF NOT EXISTS updates (
   ack_id INTEGER,
   created INTEGER
 );
+
+CREATE TABLE IF NOT EXISTS snapshots (
+  name TEXT PRIMARY KEY,
+  body TEXT NOT NULL,
+  updated INTEGER
+);

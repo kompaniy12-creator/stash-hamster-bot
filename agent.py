@@ -35,7 +35,7 @@ MAX_FILE_CHARS = 40_000
 
 # Переменные, которые агенту видеть незачем (токен бота, ключ норки).
 BOT_SECRETS = ("TELEGRAM_BOT_TOKEN", "STASH_DATA_KEY", "TELEGRAM_ALLOWED_USER_ID", "GITHUB_TOKEN", "GH_TOKEN",
-               "STASH_QUEUE_SECRET")
+               "STASH_QUEUE_SECRET", "STASH_DASH_SECRET")
 
 
 def scrub_env() -> None:
@@ -69,6 +69,8 @@ ANALYZE_PROMPT = """Ты — помощник, который ведёт кат�
 {{"title": str, "kind": str, "summary": "2-4 предложения по-русски: что это и зачем",
   "install_plan": ["шаг 1", "шаг 2", ...], "can_auto_install": bool,
   "risk": "low|medium|high — пояснение", "already_installed": bool,
+  "can": ["3-5 коротких пунктов по-русски: что конкретно умеет / какие задачи решает"],
+  "install_names": ["имена скиллов/плагинов/MCP/команд, под которыми это появится после установки, в нижнем регистре"],
   "hamster_comment": "одна короткая живая реплика хомяка Стэша про эту находку (см. характер ниже), до 120 символов"}}
 
 Характер для hamster_comment (только для этого поля, остальные поля — нейтрально и по делу):
