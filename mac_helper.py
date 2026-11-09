@@ -26,6 +26,8 @@ from telegram import Bot  # noqa: E402
 
 # ключ дашборда читаем сразу: agent.scrub_env() потом уберёт секреты из окружения
 DASH_SECRET = os.getenv("STASH_DASH_SECRET", "")
+TG_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "")
+TG_CHAT = int(os.getenv("TELEGRAM_ALLOWED_USER_ID", "0") or 0)
 os.environ.pop("STASH_DASH_SECRET", None)
 BRANCH = "norka-data"
 WT = ROOT / "data" / "norka-sync"
@@ -67,10 +69,19 @@ async def main() -> None:
     done = set(json.loads(DONE.read_text())) if DONE.exists() else set()
     todo = [it for it in state["items"].values()
             if it["status"] == "approved" and f"{it['id']}@{it.get('approved_at')}" not in done]
-    if not todo:
+    removals = [r for r in (state.get("meta", {}).get("remove_queue") or [])
+                if f"rm:{r['target']}@{r['requested_at']}" not in done]
+    if not todo and not removals:
         return
-    tg = Bot(os.environ["TELEGRAM_BOT_TOKEN"])
-    chat = int(os.environ["TELEGRAM_ALLOWED_USER_ID"])
+    import remover  # noqa: PLC0415
+    tg = Bot(TG_TOKEN)
+    chat = TG_CHAT
+    short = lambda t: t.split(":", 1)[-1].split("@")[0]  # noqa: E731
+
+    def mark(key: str) -> None:
+        done.add(key)
+        DONE.write_text(json.dumps(sorted(done)))
+
     async with tg:
         for it in todo:
             key = f"{it['id']}@{it.get('approved_at')}"
@@ -79,19 +90,34 @@ async def main() -> None:
                 status, report = await agent.install(it)
             except Exception as e:  # noqa: BLE001
                 status, report = "failed", str(e)
+            targets = it.get("replace_targets") or []
+            if isinstance(targets, str):
+                targets = json.loads(targets or "[]")
+            if status == "installed" and targets:  # «поставить вместо старого»: старое выносим только после успеха
+                for t in targets:
+                    ok, msg = remover.remove(t)
+                    report += "\n\n" + P.removal_done(short(t), ok, msg)
             await tgfmt.send_md(tg, chat, f"**{P.install_head(status)} · #{it['id']} {it.get('title') or ''}**\n\n{report}")
             push_result(f"{it['id']}-{dt.datetime.now():%Y%m%d%H%M%S}.json.enc",
                         {"id": it["id"], "approved_at": it.get("approved_at"),
                          "status": status, "report": report})
-            done.add(key)
-            DONE.write_text(json.dumps(sorted(done)))
+            mark(key)
+        for r in removals:
+            ok, msg = remover.remove(r["target"])
+            await tg.send_message(chat, P.removal_done(short(r["target"]), ok, msg))
+            push_result(f"rm-{dt.datetime.now():%Y%m%d%H%M%S%f}.json.enc",
+                        {"kind": "removal", "id": 0, "target": r["target"], "requested_at": r["requested_at"],
+                         "ok": ok, "msg": msg})
+            mark(f"rm:{r['target']}@{r['requested_at']}")
+        INV_SHA.unlink(missing_ok=True)  # что-то поменялось — пересобрать опись
 
 
 INV_SHA = ROOT / "data" / "inventory.sha"
+NUDGE_FILE = ROOT / "data" / "cleanup_nudge.json"
 
 
 async def push_inventory() -> None:
-    """Опись установленного → дашборд (только если что-то поменялось)."""
+    """Опись установленного + советы по уборке → дашборд (только если что-то поменялось)."""
     url = os.getenv("STASH_DASH_URL", "").rstrip("/")
     secret = DASH_SECRET
     if not url or not secret:
@@ -100,19 +126,43 @@ async def push_inventory() -> None:
 
     import httpx
 
+    import cleanup
     import inventory
-    raw = inventory.collect()
-    base_sha = hashlib.sha256(json.dumps(raw, sort_keys=True).encode()).hexdigest()
-    if INV_SHA.exists() and INV_SHA.read_text() == base_sha:
+    inv = inventory.collect()
+    inv = await inventory.enrich(inv)
+    inv["cleanup"] = await cleanup.suggestions(inv)
+    body = json.dumps(inv, ensure_ascii=False, sort_keys=True)
+    sha = hashlib.sha256(body.encode()).hexdigest()
+    if INV_SHA.exists() and INV_SHA.read_text() == sha:
         return
-    inv = await inventory.enrich(raw)
     async with httpx.AsyncClient(timeout=30) as c:
-        r = await c.post(f"{url}/snapshot/inventory", content=json.dumps(inv, ensure_ascii=False).encode(),
+        r = await c.post(f"{url}/snapshot/inventory", content=body.encode(),
                          headers={"authorization": f"Bearer {secret}", "content-type": "application/json"})
-    if r.status_code == 200:
-        INV_SHA.write_text(base_sha)
-    else:
+    if r.status_code != 200:
         print(f"inventory push failed: {r.status_code}")
+        return
+    INV_SHA.write_text(sha)
+    await maybe_nudge_cleanup(inv["cleanup"], url)
+
+
+async def maybe_nudge_cleanup(sug: list[dict], url: str) -> None:
+    """Раз в неделю хомяк ворчит, если в норке пыльно."""
+    if not sug:
+        return
+    from telegram import InlineKeyboardButton, InlineKeyboardMarkup, WebAppInfo  # noqa: PLC0415
+    last = json.loads(NUDGE_FILE.read_text()) if NUDGE_FILE.exists() else {}
+    ids = sorted(s["id"] for s in sug)
+    if last.get("at") and (dt.datetime.now() - dt.datetime.fromisoformat(last["at"])).days < 7:
+        return
+    if last.get("ids") == ids:
+        return  # ничего нового с прошлого раза
+    cnt = {k: sum(1 for s in sug if s["kind"] == k) for k in ("duplicate", "unused", "overlap", "broken")}
+    tg = Bot(TG_TOKEN)
+    async with tg:
+        await tg.send_message(TG_CHAT, P.cleanup_nudge(cnt["duplicate"], cnt["unused"], cnt["overlap"], cnt["broken"]),
+                              reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton(
+                                  "🧹 Открыть уборку", web_app=WebAppInfo(f"{url}/app#cleanup"))]]))
+    NUDGE_FILE.write_text(json.dumps({"at": dt.datetime.now().isoformat(), "ids": ids}))
 
 
 if __name__ == "__main__":

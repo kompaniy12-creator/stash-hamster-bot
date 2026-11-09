@@ -155,14 +155,24 @@ async function apiData(req, env) {
 }
 
 async function apiAction(req, env, ctx) {
-  const { initData, id, action } = await req.json().catch(() => ({}));
+  const { initData, id, action, target } = await req.json().catch(() => ({}));
   const user = await ownerFromInitData(initData, env);
   if (!user) return new Response("forbidden", { status: 403 });
-  const cmd = { install: "install", skip: "skip" }[action];
-  if (!cmd || !Number.isInteger(id) || id <= 0) return new Response("bad request", { status: 400 });
+  const cmd = { install: "install", skip: "skip", replace: "replace", remove: "remove" }[action];
+  let arg;
+  if (cmd === "remove") {
+    const list = Array.isArray(target) ? target : [target];
+    const ok = list.length > 0 && list.length <= 80 &&
+      list.every((t) => typeof t === "string" && /^(skill|plugin|mcp):[A-Za-z0-9_.@+-]{1,120}$/.test(t));
+    if (!ok) return new Response("bad request", { status: 400 });
+    arg = list.join(" ");
+  } else {
+    if (!cmd || !Number.isInteger(id) || id <= 0) return new Response("bad request", { status: 400 });
+    arg = String(id);
+  }
   // Команда для хомяка, как будто владелец написал её в чат. Отрицательный id — чтобы не путать с настоящими.
   const uid = -Date.now();
-  const text = `/${cmd} ${id}`;
+  const text = `/${cmd} ${arg}`;
   const update = {
     update_id: uid,
     message: {
@@ -216,6 +226,13 @@ export default {
     if (req.method === "POST" && pathname === "/api/data") return apiData(req, env);
     if (req.method === "POST" && pathname === "/api/action") return apiAction(req, env, ctx);
     if (req.method === "POST" && pathname === "/snapshot/catalog") return snapshot(req, env, "catalog", env.QUEUE_SECRET);
+    if (req.method === "POST" && pathname === "/snapshot/read") {
+      if (!authorized(req, env)) return new Response("forbidden", { status: 403 });
+      const { name } = await req.json().catch(() => ({}));
+      if (name !== "inventory") return new Response("bad request", { status: 400 });
+      const row = await env.DB.prepare("SELECT body FROM snapshots WHERE name = ?").bind(name).first();
+      return new Response(row ? row.body : "null", { headers: { "content-type": "application/json" } });
+    }
     if (req.method === "POST" && pathname === "/snapshot/inventory") return snapshot(req, env, "inventory", env.DASH_SECRET);
     return new Response("🐹", { status: 404 });
   },

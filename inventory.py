@@ -7,6 +7,7 @@ import re
 from pathlib import Path
 
 HOME = Path.home()
+SYSTEM_DIRS = {"synced"}  # папки, которые ведёт сам Claude
 CLAUDE = HOME / ".claude"
 
 
@@ -34,13 +35,23 @@ def _skill(dirpath: Path, source: str) -> dict | None:
     if not md.exists():
         return None
     fm = _frontmatter(md)
-    return {"name": fm.get("name") or dirpath.name, "description": fm.get("description", "")[:600],
-            "source": source}
+    from datetime import datetime  # noqa: PLC0415
+    return {"name": fm.get("name") or dirpath.name, "dir": dirpath.name,
+            "description": fm.get("description", "")[:600], "source": source,
+            "installed_at": datetime.fromtimestamp(md.stat().st_mtime).isoformat(timespec="seconds")}
 
 
 def skills() -> list[dict]:
     d = CLAUDE / "skills"
-    out = [s for p in sorted(d.iterdir()) if p.is_dir() and (s := _skill(p, "личные"))] if d.exists() else []
+    out = []
+    for p in sorted(d.iterdir()) if d.exists() else []:
+        if not p.is_dir() or p.name.startswith("."):
+            continue
+        s = _skill(p, "личные")
+        if not s and (p.name in SYSTEM_DIRS or any(p.glob("*/SKILL.md")) or any(p.glob("*/*/SKILL.md"))):
+            continue  # служебная папка (например, синхронизация скиллов claude.ai) — не наше, не трогаем
+        out.append(s or {"name": p.name, "dir": p.name, "description": "", "source": "личные",
+                         "broken": "в папке нет SKILL.md — Claude её не видит"})
     return out
 
 
@@ -68,7 +79,8 @@ def plugins() -> list[dict]:
                 sk += [s for p in sorted(root.iterdir()) if p.is_dir() and (s := _skill(p, name))]
         cmds = sorted(p.stem for p in (path / "commands").glob("*.md")) if (path / "commands").exists() else []
         agents = sorted(p.stem for p in (path / "agents").glob("*.md")) if (path / "agents").exists() else []
-        out.append({"name": name, "marketplace": market, "version": inst.get("version"),
+        out.append({"name": name, "id": key, "marketplace": market, "version": inst.get("version"),
+                    "broken": None if path.exists() else "папка плагина пропала — переустанови или удали",
                     "description": (meta.get("description") or "")[:600],
                     "installed_at": inst.get("installedAt"), "skills": sk,
                     "commands": cmds[:50], "agents": agents[:50]})

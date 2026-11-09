@@ -87,6 +87,13 @@ def card(item: dict) -> str:
         can = json.loads(can or "[]")
     if can:
         lines += ["", "**Что умеет**"] + [f"- {one(c)}" for c in can]
+    ov = item.get("overlaps")
+    if isinstance(ov, str):
+        ov = json.loads(ov or "[]")
+    if ov:
+        label = {"duplicate": "🟰 то же самое", "replace": "🔁 можно заменить", "similar": "≈ похоже"}
+        lines += ["", "**⚠️ Уже есть в норке**"] + [
+            f"- {label.get(o.get('relation'), '≈')} `{o.get('name') or o['target']}` — {one(o.get('note', ''))}" for o in ov]
     if item.get("install_plan"):
         try:
             plan = json.loads(item["install_plan"])
@@ -101,8 +108,22 @@ def card(item: dict) -> str:
     return "\n".join(lines)
 
 
+def replace_targets(item: dict) -> list[str]:
+    ov = item.get("overlaps")
+    if isinstance(ov, str):
+        ov = json.loads(ov or "[]")
+    return [o["target"] for o in ov or [] if o.get("relation") in ("replace", "duplicate")]
+
+
 def buttons(item: dict) -> InlineKeyboardMarkup | None:
     i = item["id"]
+    if item["status"] in ("ready", "manual", "failed") and replace_targets(item):
+        return InlineKeyboardMarkup([
+            [InlineKeyboardButton("🔁 Поставить вместо старого", callback_data=f"replace:{i}")],
+            [InlineKeyboardButton("🐹 Рядом", callback_data=f"install:{i}"),
+             InlineKeyboardButton(P.BTN_LATER, callback_data=f"later:{i}"),
+             InlineKeyboardButton(P.BTN_SKIP, callback_data=f"skip:{i}")],
+        ])
     if item["status"] in ("ready", "manual", "failed"):
         label = P.BTN_INSTALL if item["status"] != "failed" else P.BTN_RETRY
         return InlineKeyboardMarkup(
@@ -117,10 +138,24 @@ def buttons(item: dict) -> InlineKeyboardMarkup | None:
 
 # ---------- фоновые задачи ----------
 
+INVENTORY: dict | None = None  # опись Mac (облако подтягивает её из Worker перед прогоном)
+
+
+def installed_listing() -> str | None:
+    inv = INVENTORY
+    if inv is None and MODE != "cloud":
+        try:
+            import inventory  # noqa: PLC0415
+            inv = inventory.collect()
+        except Exception:  # noqa: BLE001
+            inv = None
+    return agent.installed_listing(inv) if inv else None
+
+
 async def run_analysis(item_id: int, chat_id: int, msg_id: int, ctx: ContextTypes.DEFAULT_TYPE):
     storage.update(item_id, status="analyzing")
     try:
-        res = await agent.analyze(storage.get(item_id))
+        res = await agent.analyze(storage.get(item_id), installed=installed_listing())
         status = "installed" if res.get("already_installed") else (
             "ready" if res.get("can_auto_install") else "manual"
         )
@@ -134,6 +169,7 @@ async def run_analysis(item_id: int, chat_id: int, msg_id: int, ctx: ContextType
             risk=res.get("risk"),
             comment=res.get("hamster_comment"),
             can=res.get("can") or [],
+            overlaps=[o for o in (res.get("overlaps") or []) if isinstance(o, dict) and o.get("target")],
             install_names=res.get("install_names") or [],
             status=status,
         )
@@ -148,10 +184,12 @@ async def run_analysis(item_id: int, chat_id: int, msg_id: int, ctx: ContextType
     await tgfmt.send_md(ctx.bot, chat_id, card(item), reply_markup=buttons(item), edit_message_id=msg_id)
 
 
-async def run_install(item_id: int, chat_id: int, ctx: ContextTypes.DEFAULT_TYPE):
+async def run_install(item_id: int, chat_id: int, ctx: ContextTypes.DEFAULT_TYPE, replace: bool = False):
+    targets = replace_targets(storage.get(item_id)) if replace else []
     if MODE == "cloud":
-        storage.update(item_id, status="approved", approved_at=dt.datetime.now().isoformat(timespec="seconds"))
-        await ctx.bot.send_message(chat_id, P.approved(item_id))
+        storage.update(item_id, status="approved", approved_at=dt.datetime.now().isoformat(timespec="seconds"),
+                       replace_targets=targets)
+        await ctx.bot.send_message(chat_id, P.replace_queued(item_id, targets) if targets else P.approved(item_id))
         return
     storage.update(item_id, status="installing")
     msg = await ctx.bot.send_message(chat_id, P.installing(item_id, storage.get(item_id).get("title") or "без названия"))
@@ -160,6 +198,11 @@ async def run_install(item_id: int, chat_id: int, ctx: ContextTypes.DEFAULT_TYPE
     except Exception as e:  # noqa: BLE001
         log_exc("install failed", e)
         status, report = "failed", str(e)
+    if status == "installed" and targets:  # локальный режим: убираем старое сразу
+        import remover  # noqa: PLC0415
+        for t in targets:
+            ok, msg = remover.remove(t)
+            report += "\n\n" + P.removal_done(t.split(":", 1)[-1].split("@")[0], ok, msg)
     storage.update(item_id, status=status, log=report)
     item = storage.get(item_id)
     head = P.install_head(status)
@@ -276,6 +319,47 @@ async def cmd_skip(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(P.skipped() + f" (#{i})")
 
 
+TARGET_RX = re.compile(r"^(skill|plugin|mcp):[A-Za-z0-9_.@+-]{1,120}$")
+
+
+async def cmd_replace(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    i = _arg_id(ctx)
+    if not i or not storage.get(i):
+        await update.message.reply_text("🐹 Какой номер-то? Пиши так: /replace 3")
+        return
+    spawn(ctx, run_install(i, update.effective_chat.id, ctx, replace=True))
+
+
+async def cmd_remove(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    targets = [t for t in (ctx.args or []) if TARGET_RX.match(t)][:80]
+    if not targets:
+        await update.message.reply_text("🐹 Что выносить? Пиши так: /remove skill:имя (или plugin:имя@маркет, mcp:имя). "
+                                        "Проще — через «🧹 Уборка» в норке.")
+        return
+    names = [t.split(":", 1)[1].split("@")[0] for t in targets]
+    label = names[0] if len(names) == 1 else f"{len(names)} шт.: {', '.join(names[:5])}{'…' if len(names) > 5 else ''}"
+    if MODE == "cloud":
+        q = storage.meta_get("remove_queue") or []
+        now = dt.datetime.now().isoformat(timespec="seconds")
+        for t in targets:
+            if not any(x["target"] == t for x in q):
+                q.append({"target": t, "requested_at": now})
+        storage.meta_set("remove_queue", q)
+        await update.message.reply_text(P.removal_queued(label))
+    else:
+        import remover  # noqa: PLC0415
+        for t, n in zip(targets, names):
+            ok, msg = remover.remove(t)
+            await update.message.reply_text(P.removal_done(n, ok, msg))
+
+
+async def cmd_cleanup(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    url = dashboard_url()
+    kb = InlineKeyboardMarkup([[InlineKeyboardButton("🧹 Открыть уборку", web_app=WebAppInfo(url + "#cleanup"))]]) if url else None
+    await update.message.reply_text("🐹 Ревизию норки веду в приложении: дубли, пересечения и то, что пылится без дела.",
+                                    reply_markup=kb)
+
+
 def dashboard_url() -> str | None:
     base = os.getenv("STASH_QUEUE_URL", "").rstrip("/")
     return f"{base}/app" if base else None
@@ -312,9 +396,9 @@ async def on_button(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         await q.answer()  # в мгновенном режиме Worker уже ответил на кнопку
     except Exception:  # noqa: BLE001
         pass
-    if action == "install":
+    if action in ("install", "replace"):
         await q.edit_message_reply_markup(None)
-        spawn(ctx, run_install(item_id, q.message.chat_id, ctx))
+        spawn(ctx, run_install(item_id, q.message.chat_id, ctx, replace=action == "replace"))
     elif action == "later":
         await q.edit_message_reply_markup(None)
         await q.message.reply_text(P.later(item_id))
@@ -373,6 +457,9 @@ def build_app() -> Application:
     app.add_handler(CommandHandler("reanalyze", cmd_reanalyze, filters=OWNER))
     app.add_handler(CommandHandler("skip", cmd_skip, filters=OWNER))
     app.add_handler(CommandHandler("app", cmd_app, filters=OWNER))
+    app.add_handler(CommandHandler("replace", cmd_replace, filters=OWNER))
+    app.add_handler(CommandHandler("remove", cmd_remove, filters=OWNER))
+    app.add_handler(CommandHandler("cleanup", cmd_cleanup, filters=OWNER))
     app.add_error_handler(on_error)
     app.add_handler(CallbackQueryHandler(on_button))
     app.add_handler(MessageHandler(

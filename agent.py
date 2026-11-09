@@ -63,13 +63,21 @@ ANALYZE_PROMPT = """Ты — помощник, который ведёт кат�
    Пиши в плане точные команды и точные URL источников — пользователь утверждает именно их.
 4. Оцени риск: кто автор, популярность, что делает код (сеть, доступ к файлам, curl|sh и т.п.).
 
-Уже установленные skills: {installed}
+Что УЖЕ стоит у пользователя (тип:id | имя | зачем):
+{installed}
+
+Сравни находку с установленным. Если что-то уже делает то же самое — заполни overlaps:
+  relation = "duplicate" (это то же самое, ставить незачем),
+             "replace"   (новое лучше/новее старого — разумно поставить ВМЕСТО),
+             "similar"   (пересекается частично, можно держать оба).
+  target — ровно как в списке выше (тип:id), note — по-русски, до 160 символов, почему.
 
 Ответь в конце СТРОГО одним блоком ```json с полями:
 {{"title": str, "kind": str, "summary": "2-4 предложения по-русски: что это и зачем",
   "install_plan": ["шаг 1", "шаг 2", ...], "can_auto_install": bool,
   "risk": "low|medium|high — пояснение", "already_installed": bool,
   "can": ["3-5 коротких пунктов по-русски: что конкретно умеет / какие задачи решает"],
+  "overlaps": [{{"target": "тип:id из списка", "name": "имя", "relation": "duplicate|replace|similar", "note": "..."}}],
   "install_names": ["имена скиллов/плагинов/MCP/команд, под которыми это появится после установки, в нижнем регистре"],
   "hamster_comment": "одна короткая живая реплика хомяка Стэша про эту находку (см. характер ниже), до 120 символов"}}
 
@@ -224,7 +232,20 @@ def _extract_json(text: str) -> dict:
     return json.loads(raw)
 
 
-async def analyze(item: dict) -> dict:
+def installed_listing(inv: dict | None) -> str:
+    """Компактный список установленного для промпта (из описи Mac)."""
+    if not inv:
+        return _installed_skills()
+    rows = [f"skill:{s.get('dir', s['name'])} | {s['name']} | {(s.get('why') or s.get('description', ''))[:140]}"
+            for s in inv.get("skills", [])]
+    rows += [f"plugin:{p.get('id', p['name'])} | {p['name']} | {(p.get('why') or p.get('description', ''))[:140]}"
+             + (f" (скиллы: {', '.join(s['name'] for s in p.get('skills', [])[:30])})" if p.get("skills") else "")
+             for p in inv.get("plugins", [])]
+    rows += [f"mcp:{m['name']} | {m['name']} | {m.get('why', '')[:140]}" for m in inv.get("mcp", [])]
+    return "\n".join(rows)[:30000] or "нет"
+
+
+async def analyze(item: dict, installed: str | None = None) -> dict:
     WORKDIR.mkdir(parents=True, exist_ok=True)
     scrub_env()
     options = ClaudeAgentOptions(
@@ -238,7 +259,7 @@ async def analyze(item: dict) -> dict:
         max_buffer_size=BUFFER,
     )
     text = await _run(
-        ANALYZE_PROMPT.format(installed=_installed_skills(), material=_material(item), character=CHARACTER),
+        ANALYZE_PROMPT.format(installed=installed or _installed_skills(), material=_material(item), character=CHARACTER),
         options,
     )
     return _extract_json(text)

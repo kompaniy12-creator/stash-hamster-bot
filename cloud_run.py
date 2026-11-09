@@ -30,7 +30,7 @@ import persona as P  # noqa: E402
 import storage  # noqa: E402
 
 RESULTS_DIR = Path(os.getenv("STASH_RESULTS", "norka/results"))
-COMMANDS_VERSION = 3  # поднять, если поменялся список команд или кнопка меню
+COMMANDS_VERSION = 4  # поднять, если поменялся список команд или кнопка меню
 
 
 def ingest_results(tg_bot) -> int:
@@ -39,6 +39,13 @@ def ingest_results(tg_bot) -> int:
     for f in sorted(RESULTS_DIR.glob("*.json.enc")) if RESULTS_DIR.exists() else []:
         try:
             r = json.loads(crypto_store.decrypt_bytes(f.read_bytes()))
+            if r.get("kind") == "removal":
+                q = [x for x in (storage.meta_get("remove_queue") or [])
+                     if not (x["target"] == r["target"] and x["requested_at"] == r["requested_at"])]
+                storage.meta_set("remove_queue", q)
+                f.unlink()
+                n += 1
+                continue
             item = storage.get(r["id"])
             if item and item.get("approved_at") == r.get("approved_at"):
                 storage.update(r["id"], status=r["status"], log=r.get("report"))
@@ -103,11 +110,28 @@ def catalog_snapshot() -> dict:
             can = json.loads(can or "[]")
         title = it.get("title") or ""
         names = sorted({n.lower() for n in names} | {w.lower() for w in re.findall(r"[a-z0-9][a-z0-9_.-]+[a-z0-9]", title, re.I) if "-" in w})
-        items.append({"id": it["id"], "title": title, "kind": it.get("kind"), "summary": it.get("summary"),
+        ov = it.get("overlaps") or []
+        if isinstance(ov, str):
+            ov = json.loads(ov or "[]")
+        items.append({"overlaps": ov, "id": it["id"], "title": title, "kind": it.get("kind"), "summary": it.get("summary"),
                       "plan": plan, "risk": it.get("risk"), "status": it["status"], "comment": it.get("comment"),
                       "can": can, "names": names, "created_at": it.get("created_at"),
                       "report": (it.get("log") or "")[:4000] if it["status"] != "ready" else None})
-    return {"items": items}
+    return {"items": items, "remove_queue": storage.meta_get("remove_queue") or []}
+
+
+async def load_inventory() -> None:
+    """Опись Mac из Worker — чтобы при разборе сравнивать новое с уже установленным."""
+    if not QUEUE_URL:
+        return
+    try:
+        async with httpx.AsyncClient(timeout=20) as c:
+            r = await c.post(f"{QUEUE_URL}/snapshot/read", json={"name": "inventory"},
+                             headers={"authorization": f"Bearer {QUEUE_SECRET}"})
+        if r.status_code == 200:
+            bot.INVENTORY = r.json()
+    except httpx.HTTPError:
+        pass
 
 
 async def push_catalog() -> None:
@@ -138,6 +162,7 @@ async def main() -> None:
             storage.meta_set("commands_version", COMMANDS_VERSION)
 
         got = ingest_results(app.bot)
+        await load_inventory()
         updates, queue_ids = await fetch_updates(app.bot)
         seen = set(storage.meta_get("seen_updates") or [])
         for u in sorted(updates, key=lambda x: x.update_id):

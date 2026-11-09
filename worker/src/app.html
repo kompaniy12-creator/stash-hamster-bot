@@ -98,6 +98,55 @@
     opacity: 0; transition: opacity .2s; pointer-events: none; max-width: 90vw; }
   .toast.on { opacity: .92; }
   .skel { height: 64px; border-radius: var(--r); background: var(--card); margin: 8px 0; opacity: .6; }
+
+/* Stash's warm woodland workshop */
+:root { --bg:#fffcf6; --bg2:#f6f0e5; --text:#35291f; --hint:#807365; --btn:#a94e28; --btn-text:#fffaf2; --card:#fffcf6; --sep:#e9dfcf; --acorn:#a94e28; --acorn-soft:#f7e6cf; --r:22px; }
+body { background:radial-gradient(ellipse at 85% 0,#eadfc8,transparent 50%),var(--bg2); }
+.wrap { max-width:960px; padding:0 24px; }
+header { padding:24px 0 18px; gap:10px; } .ava { background:#eadbc2;width:42px;height:42px;font-size:25px; }
+.ttl {font-size:18px;} .rank {font-size:12px;} .brand-note {margin-left:auto;color:var(--hint);font-size:11px;letter-spacing:2px;}
+.hero {position:relative;display:flex;align-items:center;min-height:280px;border:1px solid #e5d5bb;border-radius:28px;background:linear-gradient(120deg,#f1dfbd,#f9edd8 60%,#e5d7b5);overflow:hidden;padding:32px;margin-bottom:20px;isolation:isolate;}
+.hero-copy {width:53%;z-index:1;} .eyebrow {color:#90603b;font-size:10px;font-weight:800;letter-spacing:2px;text-transform:uppercase;}
+.hero h1 {font-family:Georgia,serif;font-size:44px;font-weight:500;line-height:1.04;letter-spacing:-1.7px;margin:14px 0;}
+.hero p {font-size:14px;max-width:285px;color:#7b654e;line-height:1.6;margin:0;}
+.hero-art {position:absolute;width:49%;height:100%;right:0;bottom:0;cursor:pointer;border:0;background:none;padding:0;}
+.hero-art svg {width:100%;height:100%;overflow:visible;} .hamster {transform-origin:230px 220px;animation:breathe 4s ease-in-out infinite;} .eye {transform-box:fill-box;transform-origin:center;animation:blink 6s infinite;} .leaf {transform-origin:330px 235px;animation:sway 5s ease-in-out infinite;} .spark {animation:glow 3s ease-in-out infinite alternate;} .hero-art:hover .hamster {animation:happy .65s ease-in-out infinite alternate;}
+.hero-chip {display:inline-flex;margin-top:20px;gap:7px;align-items:center;font-size:11px;color:#5b6541;background:#fff9eaa8;border:1px solid #e6d6b8;border-radius:50px;padding:6px 10px;}
+.stats {gap:12px;margin:0 0 22px;} .stat {text-align:left;border:1px solid var(--sep);font:inherit;color:var(--text);cursor:pointer;padding:17px 20px;position:relative;transition:transform .2s,box-shadow .2s;}
+.stat:hover {transform:translateY(-3px);box-shadow:0 7px 15px #5739160a;} .stat b {font-size:29px;font-weight:650;letter-spacing:-1px;} .stat:nth-child(2) {background:#f2e4cd;} .stat span {font-size:12px;}
+.search {background:#f6f0e5ed;backdrop-filter:blur(16px);padding:10px 0 12px;} .search input {border:1px solid var(--sep);border-radius:14px;padding-top:14px;padding-bottom:14px;} .tabs {gap:4px;margin-top:14px;border-bottom:1px solid var(--sep);padding-bottom:10px;} .tab {background:transparent;padding:10px 15px;font-size:13px;font-weight:600;} .tab[aria-selected=true] {background:var(--text);}
+.toolbar {display:flex;gap:10px;align-items:center;margin:10px 0 0;} select,.refresh {font:inherit;font-size:12px;color:var(--text);background:var(--card);border:1px solid var(--sep);border-radius:10px;padding:9px;min-width:0;} .refresh {margin-left:auto;cursor:pointer;} .refresh:disabled {opacity:.5;}
+h2 {font-size:10px;letter-spacing:1.8px;margin:24px 3px 12px;}
+.list {background:transparent;overflow:visible;display:grid;gap:10px;} .item {background:var(--card);border:1px solid var(--sep)!important;border-radius:18px;overflow:hidden;animation:arrive .28s ease-out both;transition:border-color .2s,box-shadow .2s;} .item:hover {border-color:#cbb797!important;box-shadow:0 4px 18px #61482e08;} .item.open {border-color:#c6a37b!important;}
+.row {padding:19px;gap:14px;} .ico {width:44px;height:44px;border-radius:14px;background:#eee6d5;font-size:22px;} .name {font-size:15px;} .why {font-size:13px;line-height:1.55;margin-top:5px;} .tags {margin-top:9px;gap:6px;} .tag {font-size:10px;border-radius:5px;padding:3px 7px;} .tag.st {color:#8f542c;} .chev {font-size:22px;} .det {padding:0 20px 20px 77px;line-height:1.6;} .open .det {animation:arrive .2s ease-out;} .b {min-height:44px;border-radius:12px;} .comment {padding:12px;} .empty {border:1px dashed #d8c8ae;border-radius:22px;background:#fffaf18a;margin-top:18px;line-height:1.7;} .foot {margin:24px 0;font-size:10px;} .toast {z-index:20;box-shadow:0 8px 30px #35291f30;}
+.skel {background:linear-gradient(100deg,#eee5d6 30%,#fffaf0 50%,#eee5d6 70%);background-size:200% 100%;animation:shimmer 1.4s infinite;height:100px;}
+:focus-visible {outline:3px solid #b58145;outline-offset:3px;} .search input:focus {border-color:#b58145;} .result-note {font-size:12px;color:var(--hint);padding:10px 3px 0;}
+@keyframes breathe {50% {transform:translateY(-4px) rotate(-1deg);}} @keyframes blink {0%,43%,47%,100% {transform:scaleY(1)}45% {transform:scaleY(.1)}} @keyframes sway {50% {transform:rotate(4deg)}} @keyframes glow {to {opacity:.25;transform:translateY(-4px)}} @keyframes happy {to {transform:translateY(-9px) rotate(3deg)}} @keyframes arrive {from {opacity:0;transform:translateY(6px)}to {opacity:1;transform:none}} @keyframes shimmer {to {background-position:-200% 0}}
+@media(min-width:760px){ .hero {min-height:310px;padding:40px;} .hero h1{font-size:54px;} .stats{gap:16px;} }
+@media(max-width:520px){.wrap{padding:0 16px;}header{padding:18px 0;}.brand-note{display:none;}.hero{min-height:250px;padding:23px 19px;}.hero-copy{width:58%;}.hero h1{font-size:34px;}.hero p{font-size:12px;}.hero-art{width:55%;right:-20px;bottom:-12px;}.hero-chip{font-size:9px;}.stats{gap:7px;}.stat{padding:13px 11px;border-radius:16px;}.stat b{font-size:25px;}.stat span{font-size:10px;}.tab{padding:9px 10px;font-size:12px;}.det{padding-left:20px;}.toolbar{gap:5px;}select,.refresh{font-size:11px;padding:9px 6px;}.row{padding:15px;}}
+@media(prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important;scroll-behavior:auto!important;}}
+
+/* уборка, использование, пересечения */
+.tag.hot { background:#e3efd6; color:#4f7a2c; } .tag.cold { background:#eee6d5; color:var(--hint); }
+.tag.warn { background:#f6e3bf; color:#8a5a12; } .tag.bad { background:#f4d6cc; color:#a33a22; }
+.ov { margin-top:6px; padding:10px 12px; border-radius:12px; background:#f7ead2; border:1px solid #ecd6ad; }
+.ov div { margin:3px 0; }
+.note { color:var(--hint); font-size:12.5px; margin:-4px 3px 10px; line-height:1.5; }
+.bulk { display:flex; gap:8px; flex-wrap:wrap; margin:0 0 10px; }
+
+/* STASH / underground systems */
+:root{--bg:#0c121b;--bg2:#080d14;--text:#e1eeef;--hint:#8395a7;--btn:#a5f87a;--btn-text:#102014;--card:#101923;--sep:#233140;--acorn:#adfa80;--acorn-soft:#1c3028;}
+body{background:radial-gradient(ellipse at 90% 5%,#21314766,transparent 46%),#080d14;}
+body::before{content:"";position:fixed;inset:0;pointer-events:none;background-image:linear-gradient(#b7dbff03 1px,transparent 1px),linear-gradient(90deg,#b7dbff03 1px,transparent 1px);background-size:32px 32px;}
+.ava{background:#23352b;box-shadow:0 0 24px #adfa8010;}.ttl{letter-spacing:-.5px;}.brand-note{color:#6a8294;font-family:monospace;letter-spacing:1px;}
+.hero{border-color:#314337;background:radial-gradient(ellipse at 76% 50%,#28493e70,transparent 60%),linear-gradient(120deg,#121e28,#0c151f);border-radius:24px;box-shadow:inset 0 1px #b2ffc20c;}
+.hero::after{content:"";position:absolute;inset:0;pointer-events:none;background:repeating-linear-gradient(0deg,transparent,transparent 4px,#0000000c 5px);z-index:2;}
+.eyebrow{color:#a5f87a;font-family:monospace;letter-spacing:1.4px;font-size:10px;}.hero h1{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;font-size:48px;font-weight:760;letter-spacing:-2px;color:#ecf5f1;}.hero h1 em{font-style:normal;color:#a5f87a;text-shadow:0 0 30px #a5f87a20;}.hero p{color:#8ca3af;}.hero-chip{color:#b4f991;background:#15281e;border-color:#314e37;font-family:monospace;font-size:10px;}
+.stat{border-color:#253542;border-radius:17px;background:#101923;}.stat:nth-child(2){background:linear-gradient(110deg,#192c23,#15221e);border-color:#39553d;}.stat:nth-child(2) b{color:#a5f87a;}.stat:hover{box-shadow:0 0 20px #a5f87a0a;border-color:#617e66;}.stat b{font-family:ui-monospace,monospace;}
+.search{background:#080d14ed;}.search input{background-color:#111c27;}.tabs{border-color:#233140;}.tab[aria-selected=true]{background:#a5f87a;color:#102014;box-shadow:0 0 18px #a5f87a12;}.tab:not([aria-selected=true]):hover{background:#15212d;}
+select,.refresh{background:#111b26;border-color:#2a3a48;color:#abc1ce;}.refresh{color:#adfa80;}.item{border-color:#233441!important;background:linear-gradient(110deg,#111b27,#101822);border-radius:16px;}.item:hover{border-color:#466956!important;box-shadow:0 0 24px #a5f87a08;}.item.open{border-color:#668b63!important;}.ico{background:#22332c;box-shadow:inset 0 0 0 1px #354d40;}.item:nth-child(2n) .ico{background:#2b2543;box-shadow:inset 0 0 0 1px #44375f;}.tag{background:#1b2734;color:#9cb0bd;}.tag.st{color:#b5ee9b;background:#22372a;}.comment{background:#1c2e25;color:#b3d7ad;border-left:2px solid #a5f87a;}.b.pri{box-shadow:0 3px 18px #a5f87a13;}.b.sec{background:#24303c;}.empty{background:#101923;border-color:#304251;}.hero-art{filter:drop-shadow(0 0 30px #7dfba511);}.skel{background:linear-gradient(100deg,#15212e 30%,#26384a 50%,#15212e 70%);background-size:200% 100%;}.toast{background:#a5f87a;color:#112018;}.foot{font-family:monospace;color:#667c8d;}:focus-visible{outline-color:#a5f87a;}.search input:focus{border-color:#9ce178;}.cyber-ring{transform-origin:213px 169px;animation:orbit 22s linear infinite;}.terminal-light{animation:glow 1.8s infinite alternate;}@keyframes orbit{to{transform:rotate(360deg)}}
+@media(min-width:760px){.hero h1{font-size:56px;}}@media(max-width:520px){.hero h1{font-size:34px;letter-spacing:-1.4px;}.eyebrow{font-size:9px;letter-spacing:.7px;}.hero-chip{font-size:8px;}.hero{min-height:260px;}}
+
 </style>
 </head>
 <body>
@@ -105,22 +154,50 @@
   <header>
     <div class="ava">🐹</div>
     <div><div class="ttl">Норка Стэша</div><div class="rank" id="rank">Пересчитываю запасы…</div></div>
+    <span class="brand-note">STASH_OS / PERSONAL HACKER DEN</span>
   </header>
+
+  <section class="hero" aria-label="Добро пожаловать в норку">
+    <div class="hero-copy"><div class="eyebrow">STASH_OS v.2 / ТВОЙ ЛИЧНЫЙ ХАКЕР</div><h1>Норка<br><em>будущего.</em></h1><p>Прокачиваем твой Mac.<br>Скиллы, плагины и секретные запасы одного хомяка-хакера.</p><span class="hero-chip">● СИСТЕМА: БОЛЬШЕ ВОЗМОЖНОСТЕЙ</span></div>
+    <button class="hero-art" id="pet" aria-label="Погладить Стэша" title="Погладить Стэша">
+    <svg viewBox="0 0 400 310" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+    <defs><radialGradient id="fur"><stop stop-color="#eac68b"/><stop offset="1" stop-color="#b77a43"/></radialGradient><linearGradient id="belly" x2="0" y2="1"><stop stop-color="#fff3d7"/><stop offset="1" stop-color="#ebd6b0"/></linearGradient><linearGradient id="wood" x2="0" y2="1"><stop stop-color="#9b6945"/><stop offset="1" stop-color="#67432e"/></linearGradient></defs>
+    <path d="M72 266V132a128 128 0 01256 0v134" fill="#294638" opacity=".55"/><path d="M93 265V138a107 107 0 01214 0v127" fill="#3b6950" opacity=".22"/>
+    <ellipse cx="211" cy="279" rx="153" ry="18" fill="#6df2ac" opacity=".14"/>
+    <circle class="cyber-ring" cx="213" cy="169" r="115" stroke="#a5f87a" stroke-opacity=".35" stroke-dasharray="70 20 3 12"/>
+    <g class="leaf" stroke="#65764b" stroke-width="4"><path d="M330 268q-4-80 31-124"/><path d="M340 226q-45-4-37-39 36 3 37 39M347 203q35 1 37-32-33-3-37 32M355 174q-22-14-11-36 22 8 11 36" fill="#508374" stroke="none"/></g>
+    <g class="hamster"><ellipse cx="214" cy="226" rx="77" ry="58" fill="#252e42"/><ellipse cx="213" cy="233" rx="50" ry="45" fill="#38455a"/>
+    <circle cx="158" cy="112" r="30" fill="#b9804c"/><circle cx="158" cy="113" r="19" fill="#dca995"/><circle cx="267" cy="112" r="30" fill="#b9804c"/><circle cx="267" cy="113" r="19" fill="#dca995"/>
+    <path d="M135 156c0-49 31-67 78-67s79 26 79 70c17 44-19 67-79 67s-94-26-78-70" fill="url(#fur)"/>
+    <ellipse cx="170" cy="182" rx="39" ry="32" fill="url(#belly)"/><ellipse cx="255" cy="182" rx="39" ry="32" fill="url(#belly)"/><ellipse cx="213" cy="191" rx="30" ry="30" fill="url(#belly)"/>
+    <g class="eye"><ellipse cx="179" cy="153" rx="8" ry="11" fill="#30251f"/><circle cx="181" cy="150" r="3" fill="white"/></g><g class="eye"><ellipse cx="248" cy="153" rx="8" ry="11" fill="#30251f"/><circle cx="250" cy="150" r="3" fill="white"/></g>
+    <ellipse cx="157" cy="180" rx="13" ry="7" fill="#dba28b" opacity=".65"/><ellipse cx="270" cy="180" rx="13" ry="7" fill="#dba28b" opacity=".65"/>
+    <path d="M154 139q60-18 119 0l-5 30q-22 9-43-6h-25q-24 15-43 1z" fill="#102a2c" fill-opacity=".88" stroke="#91ffc0" stroke-width="2"/><path d="m165 147 23-4m45 0 26 4" stroke="#b6ff91" stroke-width="3"/><path d="m170 151 8 9m63-13 12 12" stroke="#8beef0" stroke-opacity=".5" stroke-width="2"/>
+    <path d="M205 173q8-6 16 0l-8 7z" fill="#9f6b5b"/><path d="M213 181v5m-10 0q10 12 20 0" stroke="#6b4938" stroke-width="2.5" stroke-linecap="round"/>
+    <path d="m143 174-22-5m22 12-25 3m165-10 23-5m-23 12 25 3" stroke="#8e6947" stroke-width="2" stroke-linecap="round"/>
+    <ellipse cx="169" cy="275" rx="26" ry="11" fill="#ac764a"/><ellipse cx="256" cy="275" rx="26" ry="11" fill="#ac764a"/>
+    <g transform="rotate(-12 214 235)" opacity="0"><path d="M192 226h43v16q-21 37-43 0z" fill="#b27737"/><rect x="187" y="218" width="53" height="15" rx="7" fill="#705036"/><path d="m212 220 4-10" stroke="#705036" stroke-width="5" stroke-linecap="round"/><path d="M201 238q0 12 8 17" stroke="#daa65f" stroke-width="3" stroke-linecap="round"/></g>
+    <ellipse cx="178" cy="231" rx="20" ry="12" transform="rotate(27 178 231)" fill="#e4bb84"/><ellipse cx="247" cy="231" rx="20" ry="12" transform="rotate(-27 247 231)" fill="#e4bb84"/></g>
+    <g><path d="m162 234 103 0-7 43h-89z" fill="#192735" stroke="#70899c" stroke-width="2"/><path d="m155 279 116 0-10 7h-95z" fill="#4c6174"/><path class="terminal-light" d="m205 248 7 6-7 6m13 0h10" stroke="#adfa80" stroke-width="3" stroke-linecap="round"/><circle cx="254" cy="241" r="2" fill="#adfa80"/></g>
+    <g transform="rotate(-8 95 260)"><rect x="52" y="239" width="68" height="39" rx="7" fill="#25304c"/><path d="M52 250h68M67 240v37m38-37v37" stroke="#7782bd" stroke-width="2"/><path d="M65 237q10-25 24 0m-1 0q13-31 24 0" fill="#b88c50"/></g>
+    <g class="spark" fill="#a5f87a"><path d="m111 101 4 10 10 4-10 4-4 10-4-10-10-4 10-4z"/><path d="m309 75 3 7 7 3-7 3-3 7-3-7-7-3 7-3z"/><circle cx="305" cy="143" r="3"/></g></svg></button>
+  </section>
   <div class="stats" id="stats"></div>
   <div class="search">
-    <input id="q" type="search" placeholder="Найти в норке" autocomplete="off">
-    <div class="tabs" role="tablist" id="tabs"></div>
+    <input id="q" type="search" placeholder="Найти скилл, плагин или сервис…" aria-label="Поиск в норке" autocomplete="off">
+    <div class="tabs" role="tablist" aria-label="Разделы кладовой" id="tabs"></div>
+    <div class="toolbar"><select id="kind" aria-label="Тип инструмента"><option value="">Все типы</option><option value="claude-skill">Скиллы</option><option value="claude-plugin">Плагины</option><option value="mcp-server">MCP</option><option value="cli-tool">CLI</option><option value="saas-service">Сервисы</option><option value="library">Библиотеки</option><option value="prompt/guide">Гайды</option><option value="other">Другое</option></select><select id="sort" aria-label="Сортировка"><option value="smart">По готовности</option><option value="new">Сначала новые</option><option value="name">По названию</option></select><button class="refresh" id="refresh" title="Обновить данные">↻ Обновить</button></div>
   </div>
-  <main id="out"><div class="skel"></div><div class="skel"></div><div class="skel"></div></main>
+  <main id="out" aria-live="polite"><div class="skel"></div><div class="skel"></div><div class="skel"></div></main>
   <div class="foot" id="foot"></div>
 </div>
-<div class="toast" id="toast"></div>
+<div class="toast" id="toast" role="status"></div>
 
 <script>
 const tg = window.Telegram && window.Telegram.WebApp;
 if (tg) { tg.ready(); tg.expand(); }
 const $ = (s) => document.querySelector(s);
-const state = { tab: "wait", q: "", data: null, open: new Set() };
+const state = { tab: location.hash === "#cleanup" ? "clean" : "wait", q: "", kind: "", sort: "smart", data: null, open: new Set(), pendingRm: new Set() };
 
 function h(tag, attrs, ...kids) {
   const el = document.createElement(tag);
@@ -189,12 +266,18 @@ function ago(ts) {
   return m < 1 ? "только что" : m < 60 ? `${m} мин назад` : m < 1440 ? `${Math.round(m / 60)} ч назад` : `${Math.round(m / 1440)} дн назад`;
 }
 
+function usageTag(u) {
+  if (!u) return null;
+  if (u.count > 0) return h("span", { class: "tag hot" }, `🔥 ${plural(u.count, "раз", "раза", "раз")}` + (u.last ? ` · ${ago(Date.parse(u.last))}` : ""));
+  return h("span", { class: "tag cold" }, "💤 не использовался 90 дн");
+}
+
 function itemNode(key, { icon, title, why, tags, details }) {
   const open = state.open.has(key);
   const node = h("div", { class: "item" + (open ? " open" : "") },
-    h("div", { class: "row", role: "button", "aria-expanded": String(open), onclick: () => {
+    h("div", { class: "row", role: "button", "aria-expanded": String(open), tabindex: "0", onkeydown: (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); e.currentTarget.click(); } }, onclick: () => {
       state.open.has(key) ? state.open.delete(key) : state.open.add(key);
-      node.classList.toggle("open"); tg?.HapticFeedback?.selectionChanged();
+      node.classList.toggle("open"); node.querySelector(".row").setAttribute("aria-expanded", String(state.open.has(key))); tg?.HapticFeedback?.selectionChanged();
     } },
       h("div", { class: "ico" }, icon),
       h("div", { class: "main" },
@@ -215,8 +298,8 @@ async function act(item, action, btn) {
       body: JSON.stringify({ initData: tg?.initData || "", id: item.id, action }) });
     if (!r.ok) throw new Error(r.status);
     tg?.HapticFeedback?.notificationOccurred("success");
-    item.status = action === "install" ? "approved" : "skipped";
-    toast(action === "install" ? "🐹 Передал хомяку — он отпишется в чате" : "💨 Выплюнул");
+    item.status = action === "skip" ? "skipped" : "approved";
+    toast(action === "skip" ? "💨 Выплюнул" : action === "replace" ? "🔁 Ставлю новое, старое вынесу" : "🐹 Передал хомяку — он отпишется в чате");
     render();
   } catch (e) {
     btn.disabled = false; tg?.HapticFeedback?.notificationOccurred("error"); toast("Не получилось, попробуй ещё раз");
@@ -229,21 +312,27 @@ function catalogNode(it) {
   const details = [];
   if (it.summary) details.push(h("h4", {}, "Зачем"), h("p", {}, ...rich(it.summary)));
   details.push(...canList(it.can));
+  const REL = { duplicate: "🟰 то же самое", replace: "🔁 можно заменить", similar: "≈ похоже" };
+  if (it.overlaps && it.overlaps.length) details.push(h("h4", {}, "⚠️ Уже есть в норке"),
+    h("div", { class: "ov" }, it.overlaps.map((o) => h("div", {}, h("b", {}, `${REL[o.relation] || "≈"} ${o.name || o.target}`), o.note ? ` — ${o.note}` : ""))));
   if (plan.length) details.push(h("h4", {}, it.status === "manual" ? "Инструкция (руками)" : "План установки"),
     h("ol", {}, plan.map((s) => h("li", {}, ...rich(s)))));
   if (it.risk) details.push(h("h4", {}, "Риск"),
     h("div", { class: "risk" }, h("span", { class: "dot", style: `background:${riskColor(it.risk)}` }), h("span", {}, ...rich(it.risk))));
   if (it.report && it.status !== "ready") details.push(h("h4", {}, "Отчёт грузчика"), h("p", { class: "orig" }, ...rich(it.report)));
   if (it.comment) details.push(h("div", { class: "comment" }, "🐹 ", ...rich(it.comment)));
+  const canReplace = (it.overlaps || []).some((o) => ["replace", "duplicate"].includes(o.relation));
   if (["ready", "manual", "failed"].includes(it.status)) {
     details.push(h("div", { class: "acts" },
-      h("button", { class: "b pri", onclick: (e) => act(it, "install", e.currentTarget) }, it.status === "failed" ? "🔁 Ещё попытка" : "🐹 Установить"),
+      canReplace ? h("button", { class: "b pri", onclick: (e) => act(it, "replace", e.currentTarget) }, "🔁 Поставить вместо старого") : null,
+      h("button", { class: canReplace ? "b sec" : "b pri", onclick: (e) => act(it, "install", e.currentTarget) }, it.status === "failed" ? "🔁 Ещё попытка" : canReplace ? "🐹 Рядом" : "🐹 Установить"),
       h("button", { class: "b sec", onclick: (e) => act(it, "skip", e.currentTarget) }, "💨 Выплюнуть")));
   }
   return itemNode(`c${it.id}`, {
     icon, title: `${it.title || "без названия"}`,
     why: it.summary,
-    tags: [h("span", { class: "tag st" }, STATUS[it.status] || it.status), h("span", { class: "tag" }, kind), h("span", { class: "tag" }, `#${it.id}`)],
+    tags: [h("span", { class: "tag st" }, STATUS[it.status] || it.status), h("span", { class: "tag" }, kind),
+      (it.overlaps || []).length ? h("span", { class: "tag warn" }, "⚠️ уже есть похожее") : null, h("span", { class: "tag" }, `#${it.id}`)].filter(Boolean),
     details,
   });
 }
@@ -251,7 +340,8 @@ function catalogNode(it) {
 function skillNode(s, prefix) {
   return itemNode(`${prefix}${s.name}`, {
     icon: "🧠", title: s.name, why: s.why || s.description,
-    tags: [s.by_stash ? h("span", { class: "tag st" }, "🐹 принёс Стэш") : null, s.source && s.source !== "личные" ? h("span", { class: "tag" }, s.source) : null].filter(Boolean),
+    tags: [s.by_stash ? h("span", { class: "tag st" }, "🐹 принёс Стэш") : null, s.source && s.source !== "личные" ? h("span", { class: "tag" }, s.source) : null,
+      usageTag(s.usage), s.broken ? h("span", { class: "tag bad" }, "сломан") : null].filter(Boolean),
     details: [...canList(s.can), s.description ? [h("h4", {}, "Оригинальное описание"), h("p", { class: "orig" }, s.description)] : []],
   });
 }
@@ -260,7 +350,7 @@ function pluginNode(p) {
   const subs = (p.skills || []).filter((s) => match(s.name, s.description, s.why));
   return itemNode(`p${p.name}`, {
     icon: "🧩", title: p.name, why: p.why || p.description,
-    tags: [p.by_stash ? h("span", { class: "tag st" }, "🐹 принёс Стэш") : null,
+    tags: [p.by_stash ? h("span", { class: "tag st" }, "🐹 принёс Стэш") : null, usageTag(p.usage),
       p.version ? h("span", { class: "tag" }, `v${p.version}`) : null,
       p.skills?.length ? h("span", { class: "tag" }, plural(p.skills.length, "скилл", "скилла", "скиллов")) : null,
       p.commands?.length ? h("span", { class: "tag" }, plural(p.commands.length, "команда", "команды", "команд")) : null].filter(Boolean),
@@ -275,7 +365,63 @@ function pluginNode(p) {
   });
 }
 
+const CLEAN = {
+  broken: ["🩹 Сломанное", "Claude их не видит или они ссылаются в пустоту."],
+  duplicate: ["🟰 Дубли", "Один и тот же скилл стоит дважды — личная копия и в плагине. Плагин обновляется сам, личную копию можно убрать."],
+  overlap: ["≈ Делают одно и то же", "Разные инструменты с одной задачей. Хомяк подсказал, что оставить."],
+  unused: ["💤 Пылятся без дела", "Не использовались 90 дней и стоят дольше месяца. Посчитано по истории Claude Code на этом Mac."],
+};
+const TYPE_KIND = { skill: "claude-skill", plugin: "claude-plugin", mcp: "mcp-server" };
+
+function removeMany(targets, label, btn) {
+  const go = async () => {
+    if (btn) btn.disabled = true;
+    try {
+      const r = await fetch("/api/action", { method: "POST", headers: { "content-type": "application/json" },
+        body: JSON.stringify({ initData: tg?.initData || "", action: "remove", target: targets }) });
+      if (!r.ok) throw new Error(r.status);
+      targets.forEach((t) => state.pendingRm.add(t));
+      tg?.HapticFeedback?.notificationOccurred("success");
+      toast("🧹 Передал грузчику — вынесет, когда Mac на связи");
+      render();
+    } catch {
+      if (btn) btn.disabled = false;
+      tg?.HapticFeedback?.notificationOccurred("error"); toast("Не получилось, попробуй ещё раз");
+    }
+  };
+  const msg = `Убрать ${label}? Скиллы уедут в Корзину (можно вернуть), плагины удалятся через Claude Code, конфиг MCP сохранится в бэкап.`;
+  if (tg?.showConfirm) tg.showConfirm(msg, (yes) => yes && go()); else if (confirm(msg)) go();
+}
+
+function cleanupNodes(inv, queue) {
+  const sug = (inv.cleanup || []).filter((s) => (!state.kind || TYPE_KIND[s.type] === state.kind) && match(s.name, s.reason, s.type));
+  const pending = new Set([...(queue || []).map((q) => q.target), ...state.pendingRm]);
+  const out = [];
+  for (const kind of ["broken", "duplicate", "overlap", "unused"]) {
+    const list = sug.filter((s) => s.kind === kind);
+    if (!list.length) continue;
+    const free = list.filter((s) => !pending.has(s.id));
+    out.push(h("h2", {}, `${CLEAN[kind][0]} · ${list.length}`), h("div", { class: "note" }, CLEAN[kind][1]));
+    if (free.length > 1) out.push(h("div", { class: "bulk" }, h("button", { class: "b sec",
+      onclick: (e) => removeMany(free.map((s) => s.id), `все ${free.length} (${CLEAN[kind][0].replace(/^\S+\s/, "").toLowerCase()})`, e.currentTarget) },
+      `🧹 Убрать все ${free.length}`)));
+    out.push(h("div", { class: "list" }, list.map((s) => {
+      const icon = { skill: "🧠", plugin: "🧩", mcp: "🔌" }[s.type] || "📦";
+      const isPending = pending.has(s.id);
+      return itemNode(`x${s.id}`, {
+        icon, title: s.name, why: s.reason,
+        tags: [h("span", { class: "tag" }, { skill: "скилл", plugin: "плагин", mcp: "MCP" }[s.type]),
+          isPending ? h("span", { class: "tag st" }, "🚚 вынесу, когда Mac на связи") : null].filter(Boolean),
+        details: isPending ? [h("p", { class: "orig" }, "Уже в очереди у грузчика.")] :
+          [h("div", { class: "acts" }, h("button", { class: "b pri", onclick: (e) => removeMany([s.id], `«${s.name}»`, e.currentTarget) }, "🧹 Убрать"))],
+      });
+    })));
+  }
+  return out;
+}
+
 function render() {
+  if (!state.data) return;
   const d = state.data || {};
   const items = d.catalog?.data?.items || [];
   const inv = d.inventory?.data || { skills: [], plugins: [], mcp: [] };
@@ -289,19 +435,20 @@ function render() {
 
   $("#rank").textContent = `${rank(items.length)} · натаскано ${items.length}`;
   $("#stats").replaceChildren(
-    h("div", { class: "stat" }, h("b", {}, installedCount), h("span", {}, "стоит на Mac")),
-    h("div", { class: "stat" }, h("b", {}, wait.length), h("span", {}, "ждут в щеках")),
-    h("div", { class: "stat" }, h("b", {}, skipped.length), h("span", {}, "выплюнуто")));
+    h("button", { class: "stat", onclick: () => switchTab("inst") }, h("b", {}, installedCount), h("span", {}, "стоит на Mac")),
+    h("button", { class: "stat", onclick: () => switchTab("wait") }, h("b", {}, wait.length), h("span", {}, "ждут в щеках")),
+    h("button", { class: "stat", onclick: () => switchTab("skip") }, h("b", {}, skipped.length), h("span", {}, "выплюнуто")));
 
-  const tabs = [["wait", "🌰 Ждут", wait.length], ["inst", "✅ Установлено", installedCount], ["skip", "💨 Выплюнуто", skipped.length]];
+  const cleanCount = (inv.cleanup || []).length;
+  const tabs = [["wait", "🌰 Ждут", wait.length], ["inst", "✅ Установлено", installedCount], ["clean", "🧹 Уборка", cleanCount], ["skip", "💨 Выплюнуто", skipped.length]];
   $("#tabs").replaceChildren(...tabs.map(([k, label, n]) => h("button", { class: "tab", role: "tab", "aria-selected": String(state.tab === k),
-    onclick: () => { state.tab = k; tg?.HapticFeedback?.selectionChanged(); render(); } }, label, h("span", { class: "n" }, n))));
+    onclick: () => { switchTab(k); } }, label, h("span", { class: "n" }, n))));
 
   let nodes = [];
   if (state.tab === "wait") {
-    const list = wait.filter((i) => match(i.title, i.summary, i.kind, i.plan?.join(" ")));
+    const list = wait.filter((i) => (!state.kind || i.kind === state.kind) && match(i.title, i.summary, i.kind, i.plan?.join(" ")));
     const order = (i) => ["ready", "failed", "manual", "approved", "installing", "analyzing", "new"].indexOf(i.status);
-    list.sort((a, b) => order(a) - order(b) || b.id - a.id);
+    list.sort((a, b) => state.sort === "name" ? (a.title || "").localeCompare(b.title || "", "ru") : state.sort === "new" ? b.id - a.id : order(a) - order(b) || b.id - a.id);
     nodes = [
       ...sect("Можно ставить", list.filter((i) => ["ready", "failed"].includes(i.status)).map(catalogNode)),
       ...sect("Ставить руками", list.filter((i) => i.status === "manual").map(catalogNode)),
@@ -310,28 +457,41 @@ function render() {
     if (!nodes.length) nodes = [h("div", { class: "empty" }, h("div", { class: "big" }, "🐹"), state.q ? "Ничего не нашёл" : "Щёки пустые, всё разложено! Кидай мне ещё добычу в чат.")];
   } else if (state.tab === "inst") {
     nodes = [
-      ...sect("Плагины", inv.plugins.filter((p) => match(p.name, p.description, p.why, (p.skills || []).map((s) => s.name + " " + (s.why || "")).join(" "))).map(pluginNode)),
-      ...sect("Личные скиллы", inv.skills.filter((s) => match(s.name, s.description, s.why)).map((s) => skillNode(s, "s"))),
-      ...sect("MCP-серверы", inv.mcp.filter((m) => match(m.name, m.why)).map((m) => itemNode(`m${m.name}`, {
-        icon: "🔌", title: m.name, why: m.why || `Подключён через ${m.transport}`, tags: [h("span", { class: "tag" }, m.transport)], details: canList(m.can) }))),
+      ...sect("Плагины", inv.plugins.filter((p) => (!state.kind || state.kind === "claude-plugin") && match(p.name, p.description, p.why, (p.skills || []).map((s) => s.name + " " + (s.why || "")).join(" "))).map(pluginNode)),
+      ...sect("Личные скиллы", inv.skills.filter((s) => (!state.kind || state.kind === "claude-skill") && match(s.name, s.description, s.why)).map((s) => skillNode(s, "s"))),
+      ...sect("MCP-серверы", inv.mcp.filter((m) => (!state.kind || state.kind === "mcp-server") && match(m.name, m.why)).map((m) => itemNode(`m${m.name}`, {
+        icon: "🔌", title: m.name, why: m.why || `Подключён через ${m.transport}`, tags: [h("span", { class: "tag" }, m.transport), usageTag(m.usage)].filter(Boolean), details: canList(m.can) }))),
     ];
     if (!d.inventory) nodes = [h("div", { class: "empty" }, h("div", { class: "big" }, "🚚"), "Грузчик на Mac ещё не прислал опись. Она появится, когда Mac будет включён.")];
     else if (!nodes.length) nodes = [h("div", { class: "empty" }, h("div", { class: "big" }, "🔎"), "Ничего не нашёл")];
+  } else if (state.tab === "clean") {
+    nodes = cleanupNodes(inv, d.catalog?.data?.remove_queue);
+    if (!d.inventory) nodes = [h("div", { class: "empty" }, h("div", { class: "big" }, "🚚"), "Грузчик на Mac ещё не прислал опись.")];
+    else if (!nodes.length) nodes = [h("div", { class: "empty" }, h("div", { class: "big" }, "✨"), state.q ? "Ничего не нашёл" : "В норке чисто! Ни дублей, ни пыли.")];
   } else {
-    nodes = sect("Выплюнуто", skipped.filter((i) => match(i.title, i.summary)).map(catalogNode));
+    nodes = sect("Выплюнуто", skipped.filter((i) => (!state.kind || i.kind === state.kind) && match(i.title, i.summary)).sort((a,b) => b.id-a.id).map(catalogNode));
     if (!nodes.length) nodes = [h("div", { class: "empty" }, h("div", { class: "big" }, "💨"), "Ничего не выплюнуто")];
   }
+  $("#sort").options[0].disabled = state.tab !== "wait"; $("#sort").options[1].disabled = state.tab === "inst";
+  if (state.sort === "name") nodes.filter(n => n.classList?.contains("list")).forEach(list => list.replaceChildren(...Array.from(list.children).sort((a,b) => a.querySelector(".name").textContent.localeCompare(b.querySelector(".name").textContent,"ru"))));
   $("#out").replaceChildren(...nodes);
   $("#foot").textContent = `Каталог обновлён ${ago(d.catalog?.updated)} · опись Mac ${ago(d.inventory?.updated)}`;
 }
 
 $("#q").addEventListener("input", (e) => { state.q = e.target.value.trim().toLowerCase(); render(); });
 
+function switchTab(k) { state.tab = k; tg?.HapticFeedback?.selectionChanged(); render(); }
+$("#kind").addEventListener("change", e => { state.kind = e.target.value; render(); });
+$("#sort").addEventListener("change", e => { state.sort = e.target.value; render(); });
+$("#refresh").addEventListener("click", () => load());
+$("#pet").addEventListener("click", () => { toast(["Доступ к орехам зашифрован. Доступ к сердцу открыт. 🐹", "Я не сплю. Я в энергосберегающем режиме. ⚡", "Взломал сложность. Установил уют. 💻"][Math.floor(Math.random()*3)]); tg?.HapticFeedback?.impactOccurred("light"); });
 async function load() {
   if (!tg || !tg.initData) {
     $("#out").replaceChildren(h("div", { class: "empty" }, h("div", { class: "big" }, "🔒"), "Норку можно открыть только из Telegram, через кнопку у бота."));
+    $("#rank").textContent = "Твоя кладовая ждёт в Telegram";
     return;
   }
+  $("#refresh").disabled = true; $("#refresh").textContent = "↻ Загружаю…";
   try {
     const r = await fetch("/api/data", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ initData: tg.initData }) });
     if (r.status === 403) throw new Error("Это не твоя норка 🐹");
@@ -339,8 +499,8 @@ async function load() {
     state.data = await r.json();
     render();
   } catch (e) {
-    $("#out").replaceChildren(h("div", { class: "empty" }, h("div", { class: "big" }, "😵"), e.message));
-  }
+    $("#out").replaceChildren(h("div", { class: "empty" }, h("div", { class: "big" }, "😵"), e.message, h("div", {class:"acts", style:"justify-content:center"}, h("button", {class:"b pri", onclick:load}, "Попробовать ещё"))));
+  } finally { $("#refresh").disabled = false; $("#refresh").textContent = "↻ Обновить"; }
 }
 load();
 </script>

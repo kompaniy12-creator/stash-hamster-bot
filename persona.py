@@ -72,6 +72,32 @@ def approved(n: int) -> str:
                 f"🐹 Записал #{n} в план разгрузки. Ставлю при первой возможности, когда Mac будет на связи.")
 
 
+def replace_queued(n: int, targets: list[str]) -> str:
+    old = ", ".join(t.split(":", 1)[-1].split("@")[0] for t in targets)
+    return pick(f"🔁 Записал: ставлю #{n}, а старое ({old}) выношу из норки. Грузчик сделает, когда Mac на связи.",
+                f"🐹 Меняем шило на мыло получше: #{n} вместо {old}. Передал грузчику.")
+
+
+def removal_queued(name: str) -> str:
+    return pick(f"🧹 Ладно, выношу «{name}» из норки. Грузчик сделает, когда Mac на связи — скиллы уедут в Корзину, их можно вернуть.",
+                f"🧹 «{name}» — на выход! Передал грузчику. Если что, достанем из Корзины.")
+
+
+def removal_done(name: str, ok: bool, msg: str) -> str:
+    if ok:
+        return pick(f"🧹 Вынес «{name}». Места в норке стало больше! ({msg})",
+                    f"🧹 Готово, «{name}» больше не занимает полку. ({msg})")
+    return f"🐹 Не смог убрать «{name}»: {msg}"
+
+
+def cleanup_nudge(dup: int, unused: int, overlap: int, broken: int) -> str:
+    parts = [f"{dup} дублей" if dup else "", f"{overlap} пересекающихся" if overlap else "",
+             f"{unused} пылятся без дела" if unused else "", f"{broken} сломанных" if broken else ""]
+    what = ", ".join(p for p in parts if p)
+    return pick(f"🧹 Провёл ревизию норки. Нашёл: {what}. Полки ломятся — давай приберёмся? Всё в норке → «🧹 Уборка».",
+                f"🐹 Фыр, пыльно тут! {what}. Загляни в «🧹 Уборка» — уберу одним нажатием, скиллы уедут в Корзину.")
+
+
 def later(n: int) -> str:
     return pick(f"🌰 Припрятал #{n} в дальний угол. Но я про него не забуду — у хомяков отличная память на запасы.",
                 f"🐹 Ладно, #{n} полежит. Но я буду поглядывать…",
@@ -150,4 +176,5 @@ COMMANDS = [
     ("install", "установить: /install N"),
     ("reanalyze", "обнюхать заново: /reanalyze N"),
     ("skip", "выплюнуть: /skip N"),
+    ("cleanup", "ревизия: что можно убрать"),
 ]
