@@ -30,7 +30,7 @@ import persona as P  # noqa: E402
 import storage  # noqa: E402
 
 RESULTS_DIR = Path(os.getenv("STASH_RESULTS", "norka/results"))
-COMMANDS_VERSION = 4  # поднять, если поменялся список команд или кнопка меню
+COMMANDS_VERSION = 5  # поднять, если поменялся список команд или кнопка меню
 
 
 def ingest_results(tg_bot) -> int:

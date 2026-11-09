@@ -119,8 +119,8 @@ def buttons(item: dict) -> InlineKeyboardMarkup | None:
     i = item["id"]
     if item["status"] in ("ready", "manual", "failed") and replace_targets(item):
         return InlineKeyboardMarkup([
-            [InlineKeyboardButton("🔁 Поставить вместо старого", callback_data=f"replace:{i}")],
-            [InlineKeyboardButton("🐹 Рядом", callback_data=f"install:{i}"),
+            [InlineKeyboardButton("🔁 Хот-своп: вместо старого", callback_data=f"replace:{i}")],
+            [InlineKeyboardButton("🐹 Рядом со старым", callback_data=f"install:{i}"),
              InlineKeyboardButton(P.BTN_LATER, callback_data=f"later:{i}"),
              InlineKeyboardButton(P.BTN_SKIP, callback_data=f"skip:{i}")],
         ])
@@ -262,7 +262,7 @@ async def cmd_list(update: Update, ctx: ContextTypes.DEFAULT_TYPE, statuses=None
         f"{it.get('title') or it['raw_input'][:50]} — {it.get('kind') or '?'}"
         for it in items
     ]
-    head = P.list_head(len(items)) if statuses else f"🐹 Всё, что тащили: {len(items)}"
+    head = P.list_head(len(items)) if statuses else f"💾 > cat ~/norka.log — записей: {len(items)}"
     await update.message.reply_text(clip(head + "\n\n" + "\n".join(lines) + "\n\n/show N — достать и показать"))
 
 
@@ -275,14 +275,14 @@ async def cmd_norka(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     waiting = st.get("ready", 0) + st.get("manual", 0) + st.get("failed", 0)
     total = st.get("total", 0)
     text = (
-        f"🏠 Норка Стэша\n\nРанг: {P.rank(total)}\n\n"
-        f"🌰 Натаскано всего: {total}\n"
-        f"✅ Разложено по полкам: {st.get('installed', 0)}\n"
-        f"🐹 Ждут в щеках: {waiting}\n"
-        f"💨 Выплюнуто: {st.get('skipped', 0)}"
+        f"🐹⌨️ root@norka:~$ stats\n\nРанг: {P.rank(total)}\n\n"
+        f"📦 Пакетов в логе: {total}\n"
+        f"✅ В проде: {st.get('installed', 0)}\n"
+        f"⏳ В очереди деплоя: {waiting}\n"
+        f"🗑 В /dev/null: {st.get('skipped', 0)}"
     )
     if waiting:
-        text += "\n\n" + ("Щёки не резиновые, давай разгружать → /list" if waiting > 3 else "Глянь /list, там немного.")
+        text += "\n\n" + ("Буфер не резиновый, давай деплоить → /list" if waiting > 3 else "Глянь /list, там пара пакетов.")
     await update.message.reply_text(text)
 
 
@@ -297,7 +297,7 @@ async def cmd_show(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     i = _arg_id(ctx)
     item = storage.get(i) if i else None
     if not item:
-        await update.message.reply_text("🐹 Какой номер-то? Пиши так: /show 3")
+        await update.message.reply_text("🐹 Missing argument. Синтаксис: /show 3")
         return
     await tgfmt.send_md(ctx.bot, update.effective_chat.id, card(item), reply_markup=buttons(item))
 
@@ -305,7 +305,7 @@ async def cmd_show(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
 async def cmd_install(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     i = _arg_id(ctx)
     if not i or not storage.get(i):
-        await update.message.reply_text("🐹 Какой номер-то? Пиши так: /install 3")
+        await update.message.reply_text("🐹 Missing argument. Синтаксис: /install 3")
         return
     spawn(ctx, run_install(i, update.effective_chat.id, ctx))
 
@@ -313,7 +313,7 @@ async def cmd_install(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
 async def cmd_skip(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     i = _arg_id(ctx)
     if not i or not storage.get(i):
-        await update.message.reply_text("🐹 Какой номер-то? Пиши так: /skip 3")
+        await update.message.reply_text("🐹 Missing argument. Синтаксис: /skip 3")
         return
     storage.update(i, status="skipped")
     await update.message.reply_text(P.skipped() + f" (#{i})")
@@ -325,7 +325,7 @@ TARGET_RX = re.compile(r"^(skill|plugin|mcp):[A-Za-z0-9_.@+-]{1,120}$")
 async def cmd_replace(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     i = _arg_id(ctx)
     if not i or not storage.get(i):
-        await update.message.reply_text("🐹 Какой номер-то? Пиши так: /replace 3")
+        await update.message.reply_text("🐹 Missing argument. Синтаксис: /replace 3")
         return
     spawn(ctx, run_install(i, update.effective_chat.id, ctx, replace=True))
 
@@ -333,7 +333,7 @@ async def cmd_replace(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
 async def cmd_remove(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     targets = [t for t in (ctx.args or []) if TARGET_RX.match(t)][:80]
     if not targets:
-        await update.message.reply_text("🐹 Что выносить? Пиши так: /remove skill:имя (или plugin:имя@маркет, mcp:имя). "
+        await update.message.reply_text("🐹 Что выпиливать? Синтаксис: /remove skill:имя (или plugin:имя@маркет, mcp:имя). "
                                         "Проще — через «🧹 Уборка» в норке.")
         return
     names = [t.split(":", 1)[1].split("@")[0] for t in targets]
@@ -355,8 +355,8 @@ async def cmd_remove(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
 
 async def cmd_cleanup(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     url = dashboard_url()
-    kb = InlineKeyboardMarkup([[InlineKeyboardButton("🧹 Открыть уборку", web_app=WebAppInfo(url + "#cleanup"))]]) if url else None
-    await update.message.reply_text("🐹 Ревизию норки веду в приложении: дубли, пересечения и то, что пылится без дела.",
+    kb = InlineKeyboardMarkup([[InlineKeyboardButton("🧹 Открыть аудит", web_app=WebAppInfo(url + "#cleanup"))]]) if url else None
+    await update.message.reply_text("🐹 Аудит стека — в норке: дубли, пересечения и всё, что висит без дела.",
                                     reply_markup=kb)
 
 
@@ -371,15 +371,15 @@ async def cmd_app(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("🐹 Норка-приложение работает только в мгновенном режиме (Cloudflare Worker).")
         return
     await update.message.reply_text(
-        "🏠 Вот моя норка: всё, что стоит на Mac, и всё, что ждёт в щеках.",
-        reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🐹 Открыть норку", web_app=WebAppInfo(url))]]),
+        "🐹⌨️ Открываю терминал норки: весь стек на Mac и всё, что в очереди.",
+        reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("💻 Войти в норку", web_app=WebAppInfo(url))]]),
     )
 
 
 async def cmd_reanalyze(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     i = _arg_id(ctx)
     if not i or not storage.get(i):
-        await update.message.reply_text("🐹 Какой номер-то? Пиши так: /reanalyze 3")
+        await update.message.reply_text("🐹 Missing argument. Синтаксис: /reanalyze 3")
         return
     reply = await update.message.reply_text(P.reanalyzing(i))
     spawn(ctx, run_analysis(i, reply.chat_id, reply.message_id, ctx))
@@ -388,7 +388,7 @@ async def cmd_reanalyze(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
 async def on_button(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     q = update.callback_query
     if q.from_user.id != OWNER_ID:
-        await q.answer("🐹 Это не твоя норка!", show_alert=True)
+        await q.answer("🐹 Access denied. Это не твоя норка.", show_alert=True)
         return
     action, raw_id = q.data.split(":")
     item_id = int(raw_id)
