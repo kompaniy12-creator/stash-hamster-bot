@@ -70,6 +70,18 @@ def _exact_duplicates(inv: dict) -> list[dict]:
     return out
 
 
+def _plural(n: int, one: str, few: str, many: str) -> str:
+    m10, m100 = n % 10, n % 100
+    return f"{n} {one if m10 == 1 and m100 != 11 else few if 2 <= m10 <= 4 and not 12 <= m100 <= 14 else many}"
+
+
+def _plugin_unused_reason(p: dict, days: int) -> str:
+    parts = len(p.get("skills", [])) + len(p.get("commands", [])) + len(p.get("agents", []))
+    if parts <= 1:
+        return f"Не использовался за {days} дней."
+    return f"Ни одна из {_plural(parts, 'частей', 'частей', 'частей').split()[0]} частей (скиллы, команды, агенты) не вызывалась за {days} дней."
+
+
 def _unused(inv: dict, days: int) -> list[dict]:
     out = []
     for s in inv["skills"]:
@@ -79,7 +91,7 @@ def _unused(inv: dict, days: int) -> list[dict]:
     for p in inv["plugins"]:
         if p.get("usage", {}).get("count") == 0 and _age_days(p.get("installed_at")) > MIN_AGE_DAYS:
             out.append({"id": f"plugin:{p['id']}", "type": "plugin", "name": p["name"], "kind": "unused",
-                        "reason": f"Ни один из {len(p['skills'])} скиллов и команд не использовался за {days} дней."})
+                        "reason": _plugin_unused_reason(p, days)})
     for m in inv["mcp"]:
         if m.get("usage", {}).get("count") == 0:
             out.append({"id": f"mcp:{m['name']}", "type": "mcp", "name": m["name"], "kind": "unused",

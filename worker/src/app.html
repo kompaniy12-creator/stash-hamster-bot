@@ -193,12 +193,51 @@ function catalogNode(it) {
   });
 }
 
+function usageText(u, days = 90) {
+  if (!u) return null;
+  if (u.count > 0) return `Вызывался ${plural(u.count, "раз", "раза", "раз")} за ${days} дней` + (u.last ? `, последний — ${ago(Date.parse(u.last))}.` : ".");
+  return `Ни разу не вызывался за ${days} дней.`;
+}
+
+// Полное описание любого установленного: зачем, что умеет, использование, состав, оригинал
+function aboutNodes(o, type) {
+  if (!o) return [h("p", { class: "orig" }, "Описания нет: этого уже нет в свежей описи Mac.")];
+  const out = [];
+  out.push(h("h4", {}, "Зачем нужен"), h("p", {}, o.why || o.description || "Автор не оставил описания."));
+  out.push(...canList(o.can));
+  const ut = usageText(o.usage);
+  if (ut) out.push(h("h4", {}, "Использование"), h("p", {}, ut));
+  if (o.broken) out.push(h("h4", {}, "Проблема"), h("p", {}, o.broken));
+  if (type === "plugin") {
+    const subs = (o.skills || []).filter((x) => match(x.name, x.description, x.why));
+    if (subs.length) out.push(h("h4", {}, `Скиллы внутри · ${subs.length}`), h("div", { class: "sub" }, subs.map((x) =>
+      h("div", { class: "s" }, h("b", {}, x.name), x.why || x.description ? [h("br"), h("span", { class: "orig" }, x.why || x.description)] : []))));
+    if (o.commands?.length) out.push(h("h4", {}, "Команды"), h("div", { class: "tags" }, o.commands.map((c) => h("code", { onclick: () => copy(`/${o.name}:${c}`) }, `/${c}`))));
+    if (o.agents?.length) out.push(h("h4", {}, "Агенты"), h("div", { class: "tags" }, o.agents.map((a) => h("span", { class: "tag" }, a))));
+  }
+  if (type === "mcp") out.push(h("h4", {}, "Подключение"), h("p", {}, `MCP-сервер «${o.name}», транспорт ${o.transport || "?"}.`));
+  if (o.description && o.why && o.description !== o.why) out.push(h("h4", {}, "Оригинальное описание"), h("p", { class: "orig" }, o.description));
+  const meta = [o.version ? `версия ${o.version}` : "", o.marketplace ? `маркетплейс ${o.marketplace}` : "",
+    o.source && o.source !== "личные" ? `из ${o.source}` : (type === "skill" ? "личный скилл (~/.claude/skills)" : ""),
+    o.installed_at ? `стоит с ${new Date(o.installed_at).toLocaleDateString("ru-RU")}` : ""].filter(Boolean);
+  if (meta.length) out.push(h("p", { class: "orig", style: "margin-top:10px" }, meta.join(" · ")));
+  return out;
+}
+
+function invLookup(inv, id) {
+  const [type, name] = [id.slice(0, id.indexOf(":")), id.slice(id.indexOf(":") + 1)];
+  if (type === "skill") return inv.skills.find((x) => x.dir === name || x.name === name);
+  if (type === "plugin") return inv.plugins.find((x) => x.id === name || x.name === name);
+  if (type === "mcp") return inv.mcp.find((x) => x.name === name);
+  return null;
+}
+
 function skillNode(s, prefix) {
   return itemNode(`${prefix}${s.name}`, {
     icon: "🧠", title: s.name, why: s.why || s.description,
     tags: [s.by_stash ? h("span", { class: "tag st" }, "🐹 задеплоил Стэш") : null, s.source && s.source !== "личные" ? h("span", { class: "tag" }, s.source) : null,
       usageTag(s.usage), s.broken ? h("span", { class: "tag bad" }, "битый") : null].filter(Boolean),
-    details: [...canList(s.can), s.description ? [h("h4", {}, "Оригинальное описание"), h("p", { class: "orig" }, s.description)] : []],
+    details: aboutNodes(s, "skill"),
   });
 }
 
@@ -210,14 +249,7 @@ function pluginNode(p) {
       p.version ? h("span", { class: "tag" }, `v${p.version}`) : null,
       p.skills?.length ? h("span", { class: "tag" }, plural(p.skills.length, "скилл", "скилла", "скиллов")) : null,
       p.commands?.length ? h("span", { class: "tag" }, plural(p.commands.length, "команда", "команды", "команд")) : null].filter(Boolean),
-    details: [
-      ...canList(p.can),
-      subs.length ? [h("h4", {}, "Скиллы внутри"), h("div", { class: "sub" }, subs.map((s) =>
-        h("div", { class: "s" }, h("b", {}, s.name), s.why || s.description ? [h("br"), h("span", { class: "orig" }, s.why || s.description)] : [])))] : [],
-      p.commands?.length ? [h("h4", {}, "Команды"), h("div", { class: "tags" }, p.commands.map((c) => h("code", { onclick: () => copy(`/${p.name}:${c}`) }, `/${c}`)))] : [],
-      p.description && p.why ? [h("h4", {}, "Оригинальное описание"), h("p", { class: "orig" }, p.description)] : [],
-      p.marketplace ? h("p", { class: "orig", style: "margin-top:10px" }, `Маркетплейс: ${p.marketplace}`) : null,
-    ],
+    details: aboutNodes(p, "plugin"),
   });
 }
 
@@ -268,8 +300,12 @@ function cleanupNodes(inv, queue) {
         icon, status: isPending ? "В очереди на выпил" : "Рекомендация после аудита", title: s.name, why: s.reason,
         tags: [h("span", { class: "tag" }, { skill: "скилл", plugin: "плагин", mcp: "MCP" }[s.type]),
           isPending ? h("span", { class: "tag st" }, "🚚 выпилю, когда Mac онлайн") : null].filter(Boolean),
-        details: isPending ? [h("p", { class: "orig" }, "Уже в очереди. Жду пинга от Mac.")] :
-          [h("div", { class: "acts" }, h("button", { class: "b pri", onclick: (e) => removeMany([s.id], `«${s.name}»`, e.currentTarget) }, "🧹 Выпилить"))],
+        details: [
+          h("h4", {}, "Почему в уборке"), h("div", { class: "ov" }, s.reason),
+          ...aboutNodes(invLookup(inv, s.id), s.type),
+          isPending ? h("p", { class: "orig", style: "margin-top:12px" }, "Уже в очереди. Жду пинга от Mac.") :
+            h("div", { class: "acts" }, h("button", { class: "b pri", onclick: (e) => removeMany([s.id], `«${s.name}»`, e.currentTarget) }, "🧹 Выпилить")),
+        ],
       });
     })));
   }
@@ -316,7 +352,7 @@ function render() {
       ...sect("Плагины", inv.plugins.filter((p) => (!state.kind || state.kind === "claude-plugin") && match(p.name, p.description, p.why, (p.skills || []).map((s) => s.name + " " + (s.why || "")).join(" "))).map(pluginNode)),
       ...sect("Личные скиллы", inv.skills.filter((s) => (!state.kind || state.kind === "claude-skill") && match(s.name, s.description, s.why)).map((s) => skillNode(s, "s"))),
       ...sect("MCP-серверы", inv.mcp.filter((m) => (!state.kind || state.kind === "mcp-server") && match(m.name, m.why)).map((m) => itemNode(`m${m.name}`, {
-        icon: "🔌", title: m.name, why: m.why || `Подключён через ${m.transport}`, tags: [h("span", { class: "tag" }, m.transport), usageTag(m.usage)].filter(Boolean), details: canList(m.can) }))),
+        icon: "🔌", title: m.name, why: m.why || `Подключён через ${m.transport}`, tags: [h("span", { class: "tag" }, m.transport), usageTag(m.usage)].filter(Boolean), details: aboutNodes(m, "mcp") }))),
     ];
     if (!d.inventory) nodes = [h("div", { class: "empty" }, h("div", { class: "big" }, "🚚"), "Mac ещё не выходил в сеть. Опись прилетит, когда он будет онлайн.")];
     else if (!nodes.length) nodes = [h("div", { class: "empty" }, h("div", { class: "big" }, "🔎"), "Ничего не нашёл")];
