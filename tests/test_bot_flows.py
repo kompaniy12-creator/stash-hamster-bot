@@ -25,7 +25,6 @@ def app(monkeypatch):
     a = bot.build_app()
     a._initialized = True
     a.bot._bot_user = User(1, "Stash", True, username="stash_skills_bot")
-    a.sent = sent
     return a
 
 
