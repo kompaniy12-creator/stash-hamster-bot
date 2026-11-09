@@ -12,6 +12,12 @@ def pick(*options: str) -> str:
     return random.choice(options)
 
 
+def plural(n: int, one: str, few: str, many: str) -> str:
+    m10, m100 = n % 10, n % 100
+    word = one if m10 == 1 and m100 != 11 else few if 2 <= m10 <= 4 and not 12 <= m100 <= 14 else many
+    return f"{n} {word}"
+
+
 # --- приём ---
 def received(n: int) -> str:
     return pick(
@@ -93,8 +99,10 @@ def removal_done(name: str, ok: bool, msg: str) -> str:
 
 
 def cleanup_nudge(dup: int, unused: int, overlap: int, broken: int) -> str:
-    parts = [f"{dup} дублей" if dup else "", f"{overlap} пересекающихся" if overlap else "",
-             f"{unused} висят без дела" if unused else "", f"{broken} битых" if broken else ""]
+    parts = [plural(dup, "дубль", "дубля", "дублей") if dup else "",
+             plural(overlap, "пересечение", "пересечения", "пересечений") if overlap else "",
+             plural(unused, "висит без дела", "висят без дела", "висят без дела") if unused else "",
+             plural(broken, "битый", "битых", "битых") if broken else ""]
     what = ", ".join(p for p in parts if p)
     return pick(f"🧹 Прогнал аудит норки. Нашёл: {what}. Стек раздут — почистим? Всё в норке → «🧹 Уборка».",
                 f"🐹 > du -sh ~/.claude… многовато. {what}. Загляни в «🧹 Уборка» — выпилю в один клик, с бэкапом в Корзину.")
