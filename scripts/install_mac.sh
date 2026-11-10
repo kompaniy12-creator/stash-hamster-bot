@@ -8,7 +8,7 @@ MODE="${1:-helper}"
 AGENTS=~/Library/LaunchAgents
 mkdir -p "$AGENTS" "$DIR/data"
 chmod 700 "$DIR/data"; [ -f "$DIR/.env" ] && chmod 600 "$DIR/.env"
-cd "$DIR" && uv sync -q
+cd "$DIR" && uv sync -q --extra voice
 
 render() { # label script log schedule
   sed -e "s|__LABEL__|$1|g" -e "s|__DIR__|$DIR|g" -e "s|__HOME__|$HOME|g" \

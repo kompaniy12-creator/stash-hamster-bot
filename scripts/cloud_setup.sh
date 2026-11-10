@@ -8,7 +8,7 @@ source .env 2>/dev/null || true
 [ -n "$TELEGRAM_BOT_TOKEN" ] && [ -n "$TELEGRAM_ALLOWED_USER_ID" ] || { echo "❌ Заполни .env"; exit 1; }
 REPO=$(gh repo view --json nameWithOwner -q .nameWithOwner)
 echo "🐹 Переезжаем в $REPO"
-uv sync -q
+uv sync -q --extra voice
 chmod 600 .env; mkdir -p data; chmod 700 data
 
 # 1. Ключ шифрования норки

@@ -122,6 +122,9 @@ def replace_targets(item: dict) -> list[str]:
 
 def buttons(item: dict) -> InlineKeyboardMarkup | None:
     i = item["id"]
+    if item["status"] == "analyze_failed":
+        return InlineKeyboardMarkup([[InlineKeyboardButton(P.BTN_RESCAN, callback_data=f"reanalyze:{i}"),
+                                      InlineKeyboardButton(P.BTN_SKIP, callback_data=f"skip:{i}")]])
     if item["status"] in ("ready", "manual", "failed") and replace_targets(item):
         return InlineKeyboardMarkup([
             [InlineKeyboardButton("🔁 Хот-своп: вместо старого", callback_data=f"replace:{i}")],
@@ -182,18 +185,26 @@ async def run_analysis(item_id: int, chat_id: int, msg_id: int, ctx: ContextType
             install_names=res.get("install_names") or [],
             status=status,
         )
+        if res.get("source_text") and not storage.get(item_id).get("attachment_text"):
+            storage.update(item_id, attachment_text=str(res["source_text"])[:2000])
     except Exception as e:  # noqa: BLE001
         log_exc("analyze failed", e)
-        storage.update(item_id, status="failed", log=str(e))
-        await ctx.bot.edit_message_text(
-            clip(P.analyze_failed(item_id, e)), chat_id, msg_id
-        )
+        storage.update(item_id, status="analyze_failed", log=str(e))
+        try:
+            await ctx.bot.edit_message_text(clip(P.analyze_failed(item_id, e)), chat_id, msg_id,
+                                            reply_markup=buttons(storage.get(item_id)))
+        except Exception:  # noqa: BLE001
+            pass
         return
     item = storage.get(item_id)
     await tgfmt.send_md(ctx.bot, chat_id, card(item), reply_markup=buttons(item), edit_message_id=msg_id)
 
 
 async def run_install(item_id: int, chat_id: int, ctx: ContextTypes.DEFAULT_TYPE, replace: bool = False):
+    it = storage.get(item_id)
+    if it["status"] in ("analyze_failed", "new", "analyzing") or not it.get("install_plan") or it["install_plan"] == "[]":
+        await ctx.bot.send_message(chat_id, P.need_rescan(item_id))
+        return
     targets = replace_targets(storage.get(item_id)) if replace else []
     if MODE == "cloud":
         storage.update(item_id, status="approved", approved_at=dt.datetime.now().isoformat(timespec="seconds"),
@@ -286,6 +297,8 @@ async def on_material(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         spawn(ctx, answer_search(raw.lstrip("? ").strip(), m.chat_id, ctx, ACK.get(update.update_id)))
         return
     item_id = storage.add(text.strip() or "(файл)", file_path)
+    if file_path and not agent.image_of({"file_path": file_path}):
+        storage.update(item_id, attachment_text=agent.file_text(file_path))
     ack_id = ACK.get(update.update_id)
     reply = None
     if ack_id:  # Worker уже сказал «Хап!» — дописываем то же сообщение, а не шлём новое
@@ -299,7 +312,7 @@ async def on_material(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
 
 
 async def cmd_list(update: Update, ctx: ContextTypes.DEFAULT_TYPE, statuses=None):
-    statuses = statuses if statuses is not None else ["ready", "manual", "failed", "new"]
+    statuses = statuses if statuses is not None else ["ready", "manual", "failed", "analyze_failed", "approved", "new"]
     items = storage.list_items(statuses or None)
     if not items:
         await update.message.reply_text(P.empty_list())
@@ -319,7 +332,7 @@ async def cmd_all(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
 
 async def cmd_norka(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     st = storage.stats()
-    waiting = st.get("ready", 0) + st.get("manual", 0) + st.get("failed", 0)
+    waiting = sum(st.get(k, 0) for k in ("ready", "manual", "failed", "analyze_failed", "approved"))
     total = st.get("total", 0)
     text = (
         f"🐹⌨️ root@norka:~$ stats\n\nРанг: {P.rank(total)}\n\n"
@@ -495,6 +508,10 @@ async def on_button(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     if action in ("install", "replace"):
         await q.edit_message_reply_markup(None)
         spawn(ctx, run_install(item_id, q.message.chat_id, ctx, replace=action == "replace"))
+    elif action == "reanalyze":
+        await q.edit_message_reply_markup(None)
+        reply = await q.message.reply_text(P.reanalyzing(item_id))
+        spawn(ctx, run_analysis(item_id, reply.chat_id, reply.message_id, ctx))
     elif action == "later":
         await q.edit_message_reply_markup(None)
         await q.message.reply_text(P.later(item_id))

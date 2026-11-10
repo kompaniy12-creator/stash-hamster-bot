@@ -49,12 +49,14 @@ def card_footer(status: str) -> str:
         "skipped": "Отправил в /dev/null.",
         "approved": "В очереди на деплой. Жду, когда Mac выйдет в сеть.",
         "failed": "Билд упал. Можно перезапустить.",
+        "analyze_failed": "Скан упал, плана нет. Жми «Пересканировать».",
     }.get(status, "")
 
 
 # --- кнопки и действия ---
 BTN_INSTALL = "🐹 Задеплоить"
 BTN_RETRY = "🔁 Перезапуск"
+BTN_RESCAN = "🔎 Пересканировать"
 BTN_LATER = "🌰 В бэклог"
 BTN_SKIP = "🗑 В /dev/null"
 
@@ -124,6 +126,19 @@ def updates_nudge(n: int, names: list[str]) -> str:
     sample = ", ".join(names[:4]) + ("…" if len(names) > 4 else "")
     return pick(f"⬆️ > apt list --upgradable: {plural(n, 'пакет', 'пакета', 'пакетов')} можно обновить ({sample}). Накатить — в норке, вкладка «Прод».",
                 f"🐹 Вышли свежие версии: {sample}. Всего {n}. Обновлю в один клик из норки.")
+
+
+def recovering(n: int) -> str:
+    return f"🐹 Прошлый прогон оборвался на #{n}. Пересканирую с начала…"
+
+
+def stale_approved(n: int, title: str, hours: int) -> str:
+    return (f"🚚 #{n} «{title}» ждёт деплоя уже {hours} ч — Mac не выходит на связь. "
+            f"Включи Mac (грузчик подхватит сам) или отмени: /skip {n}")
+
+
+def need_rescan(n: int) -> str:
+    return f"🐹 У #{n} нет плана: скан не дошёл до конца. Сначала /reanalyze {n}"
 
 
 def later(n: int) -> str:

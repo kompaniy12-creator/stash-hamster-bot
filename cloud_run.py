@@ -51,7 +51,7 @@ def ingest_results(tg_bot) -> int:
             if item and item.get("approved_at") == r.get("approved_at"):
                 storage.update(r["id"], status=r["status"], log=r.get("report"))
         except Exception as e:  # noqa: BLE001
-            print(f"bad result {f}: {e}", file=sys.stderr)
+            print(f"bad result {f.name}: {type(e).__name__}", file=sys.stderr)
         f.unlink()
         n += 1
     return n
@@ -69,6 +69,13 @@ async def reminders(tg_bot) -> None:
     if now.hour >= int(os.getenv("NUDGE_HOUR", "19")) and storage.meta_get("last_nudge") != today:
         storage.meta_set("last_nudge", today)
         await bot.daily_nudge(ctx)
+    for it in storage.list_items(["approved"], limit=200):  # одобрено, а Mac молчит больше суток
+        if it.get("stale_notified") or not it.get("approved_at"):
+            continue
+        hours = int((now - dt.datetime.fromisoformat(it["approved_at"])).total_seconds() // 3600)
+        if hours >= 24:
+            storage.update(it["id"], stale_notified=today)
+            await tg_bot.send_message(bot.OWNER_ID, P.stale_approved(it["id"], it.get("title") or "без названия", hours))
 
 
 async def fetch_updates(tg_bot) -> tuple[list[Update], list[int]]:
@@ -89,11 +96,52 @@ async def fetch_updates(tg_bot) -> tuple[list[Update], list[int]]:
     return list(await tg_bot.get_updates(offset=offset, timeout=0, allowed_updates=Update.ALL_TYPES)), []
 
 
-async def confirm(ids: list[int]) -> None:
+CONFIRM_FILE = Path(os.getenv("STASH_CONFIRM_FILE", "data/confirm_ids.json"))
+
+
+def note_processed(ids: list[int]) -> None:
+    """Очередь чистим только ПОСЛЕ того, как норка сохранена (шаг workflow). Здесь — список, что чистить."""
+    CONFIRM_FILE.parent.mkdir(parents=True, exist_ok=True)
+    CONFIRM_FILE.write_text(json.dumps(ids))
+
+
+async def confirm() -> int:
+    ids = json.loads(CONFIRM_FILE.read_text()) if CONFIRM_FILE.exists() else []
     if QUEUE_URL and ids:
         async with httpx.AsyncClient(timeout=20) as c:
-            await c.post(f"{QUEUE_URL}/done", json={"ids": ids},
-                         headers={"authorization": f"Bearer {QUEUE_SECRET}"})
+            r = await c.post(f"{QUEUE_URL}/done", json={"ids": ids},
+                             headers={"authorization": f"Bearer {QUEUE_SECRET}"})
+            r.raise_for_status()
+    CONFIRM_FILE.unlink(missing_ok=True)
+    return len(ids)
+
+
+def trim_seen(seen: set[int]) -> list[int]:
+    """Помним последние 300 настоящих апдейтов и 300 команд из приложения (у них отрицательные id)."""
+    pos = sorted(x for x in seen if x > 0)[-300:]
+    neg = sorted((x for x in seen if x <= 0), key=abs)[-300:]
+    return pos + neg
+
+
+MAX_ATTEMPTS = 2
+
+
+async def recover_stuck(app) -> int:
+    """Прошлый прогон упал посреди разбора → находка осталась в «new/analyzing». Досканируем."""
+    n = 0
+    for it in storage.list_items(["new", "analyzing"], limit=200):
+        tries = int(it.get("attempts") or 0) + 1
+        storage.update(it["id"], attempts=tries)
+        if tries > MAX_ATTEMPTS:
+            storage.update(it["id"], status="analyze_failed", log="разбор дважды оборвался")
+            await app.bot.send_message(bot.OWNER_ID, P.analyze_failed(it["id"], "разбор дважды оборвался"),
+                                       reply_markup=bot.buttons(storage.get(it["id"])))
+            continue
+        m = await app.bot.send_message(bot.OWNER_ID, P.recovering(it["id"]))
+        bot.PENDING.append(asyncio.ensure_future(
+            bot.run_analysis(it["id"], bot.OWNER_ID, m.message_id, SimpleNamespace(bot=app.bot))))
+        n += 1
+    return n
 
 
 def catalog_snapshot() -> dict:
@@ -165,17 +213,19 @@ async def main() -> None:
 
         got = ingest_results(app.bot)
         await load_inventory()
-        updates, queue_ids = await fetch_updates(app.bot)
+        await recover_stuck(app)
+        updates, _queue_ids = await fetch_updates(app.bot)
         seen = set(storage.meta_get("seen_updates") or [])
+        processed: list[int] = []
         for u in sorted(updates, key=lambda x: x.update_id):
-            if u.update_id in seen:
-                continue  # уже обработан в прошлом прогоне
-            seen.add(u.update_id)  # сначала отмечаем: упавшее сообщение не зациклится
-            storage.meta_set("seen_updates", sorted(seen, key=abs)[-500:])
-            if u.update_id > 0:
-                storage.meta_set("tg_offset", u.update_id + 1)
-            await app.process_update(u)
-        await confirm(queue_ids)
+            if u.update_id not in seen:
+                seen.add(u.update_id)  # сначала отмечаем: упавшее сообщение не зациклится
+                storage.meta_set("seen_updates", trim_seen(seen))
+                if u.update_id > 0:
+                    storage.meta_set("tg_offset", u.update_id + 1)
+                await app.process_update(u)
+            processed.append(u.update_id)
+            note_processed(processed)  # из очереди уберём после сохранения норки
         while bot.PENDING:  # разборы, запущенные хендлерами
             batch, bot.PENDING[:] = bot.PENDING[:], []
             await asyncio.gather(*batch, return_exceptions=True)
@@ -187,5 +237,8 @@ async def main() -> None:
 
 
 if __name__ == "__main__":
-    storage.init()
-    asyncio.run(main())
+    if "--confirm" in sys.argv:
+        print(f"confirmed={asyncio.run(confirm())}")
+    else:
+        storage.init()
+        asyncio.run(main())

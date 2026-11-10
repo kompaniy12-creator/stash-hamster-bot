@@ -64,25 +64,37 @@ jobs:
           if [ -f norka/norka.enc ]; then
             uv run python crypto_store.py decrypt norka/norka.enc data/norka.json
           fi
+          touch data/.loaded   # норка прочитана: дальше её можно сохранять даже при сбое прогона
 
       - name: Хомяк просыпается
         run: uv run python cloud_run.py
 
       - name: Спрятать норку обратно
+        if: always()
         run: |
+          # Сохраняем и после сбоя (находка не потеряется), но только если норка была успешно прочитана.
+          [ -f data/.loaded ] && [ -f data/norka.json ] || { echo "норка не загружалась, не трогаю"; exit 0; }
           new_sha=$(sha256sum data/norka.json | cut -d' ' -f1)
           old_sha=$(cat norka/norka.sha 2>/dev/null || true)
           if [ "$new_sha" != "$old_sha" ]; then
             uv run python crypto_store.py encrypt data/norka.json norka/norka.enc
             echo "$new_sha" > norka/norka.sha
           fi
+          saved=1
           cd norka
           git add -A
-          if git diff --cached --quiet; then echo "без изменений"; exit 0; fi
-          git commit -q -m "🐹 норка обновлена"
-          for i in 1 2 3 4 5; do
-            git pull -q --rebase origin norka-data 2>/dev/null || true
-            git push -q origin HEAD:norka-data && exit 0
-            sleep $((i * 3))
-          done
-          exit 1
+          if git diff --cached --quiet; then
+            echo "без изменений"
+          else
+            git commit -q -m "🐹 норка обновлена"
+            saved=0
+            for i in 1 2 3 4 5; do
+              git pull -q --rebase origin norka-data 2>/dev/null || true
+              if git push -q origin HEAD:norka-data; then saved=1; break; fi
+              sleep $((i * 3))
+            done
+          fi
+          cd ..
+          [ "$saved" = 1 ] || exit 1
+          # Только теперь чистим очередь: если что-то упало раньше, сообщения останутся и обработаются снова.
+          uv run python cloud_run.py --confirm

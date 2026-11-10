@@ -23,6 +23,9 @@ TICK = 2.5
 def describe_tool(name: str, args: dict) -> str | None:
     """Короткая человекочитаемая строка о том, что делает агент. Ничего длинного и ничего похожего на секреты."""
     args = args or {}
+    if name.endswith("host_run"):
+        cmd = " ".join(str(args.get("command", "")).split())
+        return "⚡ " + (cmd[:58] + "…" if len(cmd) > 58 else cmd)
     if name == "Bash":
         cmd = " ".join(str(args.get("command", "")).split())
         return "$ " + (cmd[:58] + "…" if len(cmd) > 58 else cmd)

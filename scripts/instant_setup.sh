@@ -38,6 +38,12 @@ put OWNER_ID "$TELEGRAM_ALLOWED_USER_ID"
 put WEBHOOK_SECRET "$WEBHOOK_SECRET"
 put QUEUE_SECRET "$QUEUE_SECRET"
 put GH_REPO "$REPO"
+# Норка-приложение: грузчик на Mac шлёт опись установленного по отдельному ключу
+DASH_SECRET=$(openssl rand -hex 32)
+put DASH_SECRET "$DASH_SECRET"
+grep -v '^STASH_DASH_' "$ROOT/.env" > "$ROOT/.env.tmp" && mv "$ROOT/.env.tmp" "$ROOT/.env"
+printf '\n# Норка-приложение: куда грузчик шлёт опись установленного\nSTASH_DASH_URL=%s\nSTASH_DASH_SECRET=%s\n' "$URL" "$DASH_SECRET" >> "$ROOT/.env"
+chmod 600 "$ROOT/.env"; unset DASH_SECRET
 
 echo
 echo "🔑 5/6 Токен GitHub, чтобы Worker мог будить хомяка"
@@ -67,5 +73,6 @@ echo "$RES" | grep -q '"ok":true' || { echo "❌ Telegram не принял webh
 unset WEBHOOK_SECRET QUEUE_SECRET
 
 echo
-echo "⚡ Готово! Хомяк отвечает «Хап!» мгновенно, карточка — примерно через минуту."
+echo "⚡ Готово! Хомяк отвечает мгновенно, карточка — примерно через минуту."
+echo "   Норка-приложение: кнопка «🐹 Норка» у бота (опись Mac появится через пару минут)."
 echo "   Вернуть как было: zsh scripts/install_mac.sh local  (или удалить webhook в Telegram)"

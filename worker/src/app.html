@@ -84,10 +84,10 @@ const KIND = {
   "prompt/guide": ["📝", "гайд"], other: ["📦", "другое"],
 };
 const STATUS = {
-  new: "🆕 в буфере", analyzing: "🔎 сканирую", ready: "📥 готов к деплою", manual: "✋ нужен твой root",
+  new: "🆕 в буфере", analyze_failed: "⚠️ скан упал", analyzing: "🔎 сканирую", ready: "📥 готов к деплою", manual: "✋ нужен твой root",
   approved: "🚚 в пайплайне", installing: "⚙️ деплоится", installed: "✅ в проде", failed: "❌ билд упал", skipped: "🗑 в /dev/null",
 };
-const WAIT = ["new", "analyzing", "ready", "manual", "approved", "installing", "failed"];
+const WAIT = ["new", "analyzing", "ready", "manual", "approved", "installing", "failed", "analyze_failed"];
 function kindOf(k) {
   const key = String(k || "other").toLowerCase();
   return KIND[key] || KIND[Object.keys(KIND).find((x) => key.includes(x.split("-")[0])) || "other"];
@@ -153,7 +153,7 @@ async function act(item, action, btn) {
     if (!r.ok) throw new Error(r.status);
     tg?.HapticFeedback?.notificationOccurred("success");
     pendingActions.delete(item.id);
-    item.status = action === "skip" ? "skipped" : "approved";
+    item.status = action === "skip" ? "skipped" : action === "reanalyze" ? "analyzing" : "approved";
     toast(action === "skip" ? "🗑 > /dev/null" : action === "replace" ? "🔁 Хот-своп в пайплайне" : "🐹 В пайплайне деплоя — лог придёт в чат");
     render();
   } catch (e) {
@@ -178,6 +178,11 @@ function catalogNode(it) {
   if (it.report && it.status !== "ready") details.push(h("h4", {}, "Лог грузчика"), h("p", { class: "orig" }, ...rich(it.report)));
   if (it.comment) details.push(h("div", { class: "comment" }, "🐹 ", ...rich(it.comment)));
   const canReplace = (it.overlaps || []).some((o) => ["replace", "duplicate"].includes(o.relation));
+  if (it.status === "analyze_failed") {
+    details.push(h("div", { class: "acts" },
+      h("button", { class: "b pri", onclick: (e) => act(it, "reanalyze", e.currentTarget) }, "🔎 Пересканировать"),
+      h("button", { class: "b sec", onclick: (e) => act(it, "skip", e.currentTarget) }, "🗑 В /dev/null")));
+  }
   if (["ready", "manual", "failed"].includes(it.status)) {
     details.push(h("div", { class: "acts" },
       canReplace ? h("button", { class: "b pri", onclick: (e) => act(it, "replace", e.currentTarget) }, "🔁 Хот-своп: вместо старого") : null,
@@ -388,7 +393,7 @@ function render() {
     const order = (i) => ["ready", "failed", "manual", "approved", "installing", "analyzing", "new"].indexOf(i.status);
     list.sort((a, b) => state.sort === "name" ? (a.title || "").localeCompare(b.title || "", "ru") : state.sort === "new" ? b.id - a.id : order(a) - order(b) || b.id - a.id);
     nodes = [
-      ...sect("Готово к деплою", list.filter((i) => ["ready", "failed"].includes(i.status)).map(catalogNode)),
+      ...sect("Готово к деплою", list.filter((i) => ["ready", "failed", "analyze_failed"].includes(i.status)).map(catalogNode)),
       ...sect("Нужен твой root", list.filter((i) => i.status === "manual").map(catalogNode)),
       ...sect("В пайплайне", list.filter((i) => ["approved", "installing", "analyzing", "new"].includes(i.status)).map(catalogNode)),
     ];

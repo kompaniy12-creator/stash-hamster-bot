@@ -47,18 +47,54 @@ def sync() -> None:
     git("reset", "--hard", f"origin/{BRANCH}", cwd=WT)
 
 
+OUTBOX = ROOT / "data" / "outbox"
+
+
 def push_result(name: str, payload: dict) -> None:
-    f = WT / "results" / name
-    f.parent.mkdir(parents=True, exist_ok=True)
-    f.write_bytes(crypto_store.encrypt_bytes(json.dumps(payload, ensure_ascii=False).encode()))
-    git("add", str(f), cwd=WT)
-    git("-c", "user.name=stash-mac-helper", "-c", "user.email=stash@localhost",
-        "commit", "-m", f"🐹 результат установки #{payload['id']}", cwd=WT)
-    for _ in range(5):
+    """Отчёт сначала ложится в локальный outbox, и только потом уходит в git.
+    Если сети нет, он уйдёт при следующем запуске, а установка НЕ повторится."""
+    OUTBOX.mkdir(parents=True, exist_ok=True)
+    (OUTBOX / name).write_bytes(crypto_store.encrypt_bytes(json.dumps(payload, ensure_ascii=False).encode()))
+
+
+def flush_outbox() -> bool:
+    files = sorted(OUTBOX.glob("*.enc")) if OUTBOX.exists() else []
+    if not files:
+        return True
+    (WT / "results").mkdir(parents=True, exist_ok=True)
+    for f in files:
+        (WT / "results" / f.name).write_bytes(f.read_bytes())
+    git("add", "results", cwd=WT)
+    if git("diff", "--cached", "--quiet", cwd=WT, check=False).returncode != 0:
+        git("-c", "user.name=stash-mac-helper", "-c", "user.email=stash@localhost",
+            "commit", "-m", f"🐹 отчёты грузчика ({len(files)})", cwd=WT)
+    for _ in range(4):
         if git("pull", "--rebase", "origin", BRANCH, cwd=WT, check=False).returncode == 0 and \
            git("push", "origin", f"HEAD:{BRANCH}", cwd=WT, check=False).returncode == 0:
-            return
-    raise RuntimeError("не смог запушить результат")
+            for f in files:
+                f.unlink()
+            return True
+    print("outbox: не смог запушить, повторю в следующий запуск")
+    return False
+
+
+def housekeeping() -> None:
+    """Раз в день: чистим рабочую папку (старше 7 дней), присланные файлы и журнал выполненного."""
+    import shutil
+    import time
+    stamp = ROOT / "data" / "housekeeping.stamp"
+    if stamp.exists() and time.time() - stamp.stat().st_mtime < 86400:
+        return
+    week_ago = time.time() - 7 * 86400
+    for d in (agent.WORKDIR, ROOT / "data" / "files"):
+        for p in d.iterdir() if d.exists() else []:
+            if p.lstat().st_mtime < week_ago:
+                shutil.rmtree(p, ignore_errors=True) if p.is_dir() and not p.is_symlink() else p.unlink(missing_ok=True)
+    if DONE.exists():
+        done = json.loads(DONE.read_text())
+        if len(done) > 500:
+            DONE.write_text(json.dumps(done[-500:]))
+    stamp.touch()
 
 
 ICLOUD = Path.home() / "Library" / "Mobile Documents" / "com~apple~CloudDocs"
@@ -85,7 +121,13 @@ def backup(enc: Path) -> None:
 
 
 async def main() -> None:
-    sync()
+    try:
+        sync()
+    except subprocess.CalledProcessError:
+        print(f"{dt.datetime.now():%F %T} нет связи с GitHub, попробую позже")
+        return
+    flush_outbox()
+    housekeeping()
     enc = WT / "norka.enc"
     if not enc.exists():
         return
@@ -111,6 +153,7 @@ async def main() -> None:
     def mark(key: str) -> None:
         done.add(key)
         DONE.write_text(json.dumps(sorted(done)))
+        flush_outbox()
 
     async with tg:
         for it in todo:
@@ -242,4 +285,7 @@ if __name__ == "__main__":
         except BlockingIOError:
             sys.exit(0)  # предыдущий запуск ещё ставит
         asyncio.run(main())
-        asyncio.run(push_inventory())
+        try:
+            asyncio.run(push_inventory())
+        except Exception as e:  # noqa: BLE001  (нет сети и т.п. — не засоряем лог трейсбэками)
+            print(f"{dt.datetime.now():%F %T} опись не отправлена: {type(e).__name__}")

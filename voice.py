@@ -24,10 +24,30 @@ def transcribe(path: str) -> str:
 
 
 def _decode(path: str) -> "np.ndarray":
-    """Любой формат Telegram (ogg/opus, m4a, mp4) → 16 кГц моно float32 через ffmpeg."""
+    """Любой формат Telegram (ogg/opus, m4a, mp4) → 16 кГц моно float32.
+    Сначала PyAV (идёт вместе с faster-whisper, отдельный ffmpeg не нужен — важно для GitHub Actions),
+    если не вышло — системный ffmpeg."""
+    try:
+        import av  # noqa: PLC0415
+
+        chunks, total = [], 0
+        with av.open(path) as c:
+            rs = av.AudioResampler(format="flt", layout="mono", rate=16000)
+            for frame in c.decode(audio=0):
+                for out in rs.resample(frame):
+                    chunks.append(out.to_ndarray().reshape(-1))
+                total += sum(len(x) for x in chunks[-1:])
+                if total > 16000 * 600:
+                    break  # не больше 10 минут
+            for out in rs.resample(None):
+                chunks.append(out.to_ndarray().reshape(-1))
+        if chunks:
+            return np.concatenate(chunks).astype(np.float32)
+    except Exception:  # noqa: BLE001
+        pass
     ff = shutil.which("ffmpeg")
     if not ff:
-        raise RuntimeError("нужен ffmpeg (brew install ffmpeg)")
+        raise RuntimeError("не смог раскодировать звук: нет ни PyAV, ни ffmpeg")
     out = subprocess.run([ff, "-nostdin", "-loglevel", "error", "-i", path, "-t", "600",
                           "-f", "f32le", "-ac", "1", "-ar", "16000", "-"],
                          capture_output=True, check=True, timeout=180).stdout

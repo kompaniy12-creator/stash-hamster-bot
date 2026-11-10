@@ -12,20 +12,22 @@ from pathlib import Path
 DATA_PATH = Path(os.getenv("STASH_DATA") or Path(__file__).parent / "data" / "norka.json")
 
 STATUSES = {
-    "new": "🆕 новый",
-    "analyzing": "🔎 анализ",
-    "ready": "📥 ждёт установки",
-    "manual": "✋ ставить вручную",
-    "approved": "🚚 ждёт Mac",
-    "installing": "⚙️ ставится",
-    "installed": "✅ установлен",
-    "failed": "❌ ошибка",
-    "skipped": "🗑 не нужно",
+    "new": "🆕 в буфере",
+    "analyzing": "🔎 сканирую",
+    "analyze_failed": "⚠️ скан упал",
+    "ready": "📥 готов к деплою",
+    "manual": "✋ нужен твой root",
+    "approved": "🚚 в пайплайне",
+    "installing": "⚙️ деплоится",
+    "installed": "✅ в проде",
+    "failed": "❌ билд упал",
+    "skipped": "🗑 в /dev/null",
 }
 
 FIELDS = ("title", "kind", "summary", "install_plan", "can_auto_install", "risk",
           "log", "comment", "last_nudged", "approved_at", "can", "install_names",
-          "overlaps", "replace_targets")
+          "overlaps", "replace_targets",
+          "attempts", "attachment_text", "stale_notified")
 
 
 def _now() -> str:

@@ -15,6 +15,8 @@
 
 import APP_HTML from "./app.html";
 
+let APP_ETAG;
+
 const ACKS = [
   "🐹⌨️ Пакет перехвачен. Сканирую…",
   "💾 Получил. Запускаю анализ, проверяю на бэкдоры…",
@@ -25,6 +27,7 @@ const BUTTON_ACKS = {
   install: "🐹 Принято! В пайплайн деплоя…",
   replace: "🔁 Хот-своп в очереди…",
   later: "🌰 В бэклог!",
+  reanalyze: "🔎 Пересканирую…",
   skip: "🗑 > /dev/null",
 };
 
@@ -59,7 +62,17 @@ async function wakeGitHub(env) {
       body: JSON.stringify({ ref: env.GH_REF || "main" }),
     },
   );
-  if (!r.ok) console.log("github dispatch failed", r.status);
+  if (r.ok) return;
+  console.log("github dispatch failed", r.status);
+  // Будильник сломан → хомяк отвечает только по расписанию (раз в 15 мин). Скажем владельцу, но не чаще раза в 6 часов.
+  const row = await env.DB.prepare("SELECT updated FROM snapshots WHERE name = 'alert_gh'").first();
+  if (row && Date.now() - row.updated < 6 * 3600 * 1000) return;
+  await putSnapshot(env, "alert_gh", JSON.stringify({ status: r.status }));
+  const why = r.status === 401 || r.status === 403 ? "похоже, истёк токен GitHub у Worker"
+    : r.status === 404 ? "workflow отключён или репозиторий недоступен" : "GitHub не принял запуск";
+  await tg(env, "sendMessage", { chat_id: Number(env.OWNER_ID), text:
+    `⚠️ Не могу разбудить облако (код ${r.status}: ${why}). Пока отвечаю с задержкой до 15 минут.\n` +
+    "Починить: новый токен → cd worker && npx wrangler secret put GH_TOKEN; если workflow выключен → gh workflow enable stash.yml" });
 }
 
 async function handleTelegram(req, env, ctx) {
@@ -161,7 +174,8 @@ async function snapshot(req, env, name, secret) {
 async function apiData(req, env) {
   const { initData } = await req.json().catch(() => ({}));
   if (!(await ownerFromInitData(initData, env))) return new Response("forbidden", { status: 403 });
-  const { results } = await env.DB.prepare("SELECT name, body, updated FROM snapshots").all();
+  const { results } = await env.DB.prepare(
+    "SELECT name, body, updated FROM snapshots WHERE name IN ('catalog', 'inventory')").all();
   const out = {};
   for (const r of results || []) out[r.name] = { data: JSON.parse(r.body), updated: r.updated };
   return Response.json(out, { headers: { "cache-control": "no-store" } });
@@ -171,7 +185,8 @@ async function apiAction(req, env, ctx) {
   const { initData, id, action, target } = await req.json().catch(() => ({}));
   const user = await ownerFromInitData(initData, env);
   if (!user) return new Response("forbidden", { status: 403 });
-  const cmd = { install: "install", skip: "skip", replace: "replace", remove: "remove", update: "update" }[action];
+  const cmd = { install: "install", skip: "skip", replace: "replace", remove: "remove", update: "update",
+    reanalyze: "reanalyze" }[action];
   let arg;
   if (cmd === "remove" || cmd === "update") {
     const list = Array.isArray(target) ? target : [target];
@@ -184,7 +199,7 @@ async function apiAction(req, env, ctx) {
     arg = String(id);
   }
   // Команда для хомяка, как будто владелец написал её в чат. Отрицательный id — чтобы не путать с настоящими.
-  const uid = -Date.now();
+  const uid = -(Date.now() * 1000 + Math.floor(Math.random() * 1000)); // без совпадений при двух нажатиях подряд
   const text = `/${cmd} ${arg}`;
   const update = {
     update_id: uid,
@@ -228,9 +243,15 @@ export default {
     if (req.method === "POST" && pathname === "/drain") return drain(req, env);
     if (req.method === "POST" && pathname === "/done") return done(req, env);
     if (req.method === "GET" && pathname === "/app") {
+      // Страница тяжёлая (картинка внутри): отдаём с ETag, повторное открытие — пустой ответ 304.
+      APP_ETAG ||= `"${hex(new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(APP_HTML)))).slice(0, 32)}"`;
+      if (req.headers.get("if-none-match") === APP_ETAG) {
+        return new Response(null, { status: 304, headers: { etag: APP_ETAG, "cache-control": "no-cache" } });
+      }
       return new Response(APP_HTML, { headers: {
         "content-type": "text/html; charset=utf-8",
-        "cache-control": "no-store",
+        "cache-control": "no-cache",
+        etag: APP_ETAG,
         "content-security-policy": "default-src 'self'; script-src 'self' 'unsafe-inline' https://telegram.org; " +
           "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; " +
           "img-src 'self' data:; connect-src 'self'; frame-ancestors https://web.telegram.org https://*.telegram.org",
