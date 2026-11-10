@@ -77,7 +77,11 @@ async function handleTelegram(req, env, ctx) {
   let ackId = null;
   if (msg) {
     const text = msg.text || "";
-    if (msg.voice || msg.audio || msg.video_note) {
+    if (msg.photo && !text) {
+      const r = await tg(env, "sendMessage", { chat_id: msg.chat.id, text: "🐹📸 Скрин перехвачен. Запускаю OCR глазами Claude…",
+        reply_parameters: { message_id: msg.message_id } });
+      ackId = (r.result && r.result.message_id) || null;
+    } else if (msg.voice || msg.audio || msg.video_note) {
       const r = await tg(env, "sendMessage", { chat_id: msg.chat.id, text: "🐹🎙 Записал голос. Прогоняю через Whisper…",
         reply_parameters: { message_id: msg.message_id } });
       ackId = (r.result && r.result.message_id) || null;

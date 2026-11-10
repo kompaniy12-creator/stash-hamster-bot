@@ -136,3 +136,19 @@ def test_progress_describe_and_render():
         p.event("Bash", {"command": "ls"})
     assert p._pct() <= 95 and len(p.log) == 3
     assert "100%" in p._render(100, "t", "✅")
+
+
+# --- скриншоты ---
+def test_screenshot_goes_as_image_not_text(tmp_path):
+    img = tmp_path / "1_photo.jpg"
+    img.write_bytes(b"\xff\xd8\xff" + b"0" * 100)
+    item = {"raw_input": "[скриншот без подписи]", "file_path": str(img)}
+    assert agent.image_of(item) == img
+    m = agent._material(item)
+    assert "скриншот" in m and "\xff" not in m  # байты картинки не попадают в текст
+
+
+def test_big_image_is_skipped(tmp_path):
+    img = tmp_path / "big.png"
+    img.write_bytes(b"0" * (agent.MAX_IMAGE_BYTES + 1))
+    assert agent.image_of({"raw_input": "", "file_path": str(img)}) is None

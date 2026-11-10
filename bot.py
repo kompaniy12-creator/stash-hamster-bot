@@ -263,6 +263,14 @@ async def on_material(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
             return
         text = (f"[голосовое сообщение, расшифровка]: {heard}\n"
                 "(Если тут нет ссылки — пользователь описал инструмент словами: найди его через WebSearch.)")
+    if m.photo:  # скриншот/фото: берём самый большой размер
+        FILES_DIR.mkdir(parents=True, exist_ok=True)
+        pf = await m.photo[-1].get_file()
+        dest = FILES_DIR / f"{m.message_id}_photo.jpg"
+        await pf.download_to_drive(dest)
+        file_path = str(dest)
+        if not text.strip() or text.strip() == "[пересланное сообщение]":
+            text = (text + "\n" if text.strip() else "") + "[скриншот без подписи]"
     if m.document:
         FILES_DIR.mkdir(parents=True, exist_ok=True)
         f = await m.document.get_file()
@@ -554,7 +562,7 @@ def build_app() -> Application:
     app.add_handler(CallbackQueryHandler(on_button))
     app.add_handler(MessageHandler(
         OWNER & ~filters.COMMAND & (filters.TEXT | filters.CAPTION | filters.Document.ALL
-                                    | filters.VOICE | filters.AUDIO | filters.VIDEO_NOTE),
+                                    | filters.VOICE | filters.AUDIO | filters.VIDEO_NOTE | filters.PHOTO),
         on_material,
     ))
     return app
